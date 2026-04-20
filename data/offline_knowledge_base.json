@@ -1,0 +1,64 @@
+{
+  "entries": [
+    {
+      "id": "respiratory_common",
+      "keywords": ["发烧", "咳嗽", "喉咙痛", "流鼻涕", "感冒", "fever", "cough", "sore throat", "cold"],
+      "zh_answer": "这类症状多数属于上呼吸道感染。建议先休息、补液、监测体温，可用对症退热药。若高热超过48小时、出现气促、胸痛或血氧持续低于95%，请尽快线下就医。",
+      "en_answer": "These symptoms are often from an upper respiratory infection. Rest, hydrate, monitor temperature, and use symptom-based fever control if needed. Seek in-person care if fever lasts >48h, breathing worsens, chest pain appears, or SpO2 stays below 95%."
+    },
+    {
+      "id": "headache",
+      "keywords": ["头痛", "偏头痛", "头晕", "headache", "migraine", "dizziness"],
+      "zh_answer": "头痛先做基础处理：补水、休息、避免强光和熬夜。若出现“突发最严重头痛”、肢体无力、言语不清、持续呕吐、发热伴颈部僵硬，请立即急诊。",
+      "en_answer": "For headache, start with hydration, rest, and reduced light/noise exposure. Go to emergency care for sudden worst-ever headache, weakness, speech changes, persistent vomiting, or fever with neck stiffness."
+    },
+    {
+      "id": "hypertension",
+      "keywords": ["高血压", "血压", "blood pressure", "hypertension"],
+      "zh_answer": "建议固定时间测量血压：静坐5分钟后，间隔1分钟测2-3次取平均，并连续记录7天。若持续明显升高并伴头痛、胸闷、气促等不适，应及时就医。",
+      "en_answer": "Measure blood pressure at consistent times: rest 5 minutes, take 2-3 readings 1 minute apart, and track for 7 days. Seek care if values stay high with symptoms like headache, chest discomfort, or shortness of breath."
+    },
+    {
+      "id": "diabetes",
+      "keywords": ["糖尿病", "血糖", "低血糖", "diabetes", "blood sugar", "hypoglycemia"],
+      "zh_answer": "糖尿病管理重点是规律监测与生活方式干预。出现低血糖症状（心慌、出汗、手抖、乏力）应立即补充15克快速糖并在15分钟后复测血糖。",
+      "en_answer": "Diabetes care focuses on regular glucose monitoring plus lifestyle management. If hypoglycemia symptoms occur (sweating, tremor, palpitations, weakness), take 15g fast carbs and recheck glucose after 15 minutes."
+    },
+    {
+      "id": "gastroenteritis",
+      "keywords": ["腹泻", "呕吐", "肚子痛", "拉肚子", "diarrhea", "vomiting", "abdominal pain"],
+      "zh_answer": "急性胃肠道症状先预防脱水：小口频饮含电解质液体，清淡饮食。若出现持续高热、便血、明显乏力、尿量减少或无法进水，应尽快就医。",
+      "en_answer": "For acute GI symptoms, focus on hydration with small frequent electrolyte fluids and a bland diet. Seek care for persistent high fever, blood in stool, severe weakness, low urine output, or inability to keep fluids down."
+    },
+    {
+      "id": "sleep_anxiety",
+      "keywords": ["失眠", "焦虑", "睡不着", "insomnia", "anxiety", "stress"],
+      "zh_answer": "先做睡眠卫生管理：固定作息、睡前1小时远离屏幕与咖啡因、卧室保持安静黑暗。若持续超过2-4周影响工作生活，建议线下心理或睡眠门诊评估。",
+      "en_answer": "Start with sleep hygiene: regular schedule, no screens/caffeine 1 hour before bed, and a dark quiet room. If symptoms persist beyond 2-4 weeks and impair daily life, consider in-person mental health or sleep clinic evaluation."
+    },
+    {
+      "id": "weight_management",
+      "keywords": ["减肥", "饮食", "运动", "体重", "weight", "diet", "exercise"],
+      "zh_answer": "减重建议以可持续为主：每周中等强度运动150分钟以上，控制总热量，优先高纤维与优质蛋白。目标可设为每周下降0.25-0.5公斤。",
+      "en_answer": "For weight management, prioritize sustainability: at least 150 minutes of moderate exercise weekly, calorie control, and high-fiber/protein food choices. A practical target is 0.25-0.5 kg loss per week."
+    },
+    {
+      "id": "skin_lesion",
+      "keywords": ["皮肤", "痣", "黑色素瘤", "皮损", "skin lesion", "mole", "melanoma"],
+      "zh_answer": "皮肤病变可先用ABCDE原则自查（不对称、边界不清、颜色不均、直径增大、短期演变）。若近期快速变化、出血或破溃，建议尽快皮肤科面诊。",
+      "en_answer": "Use the ABCDE rule for skin lesions (Asymmetry, Border, Color, Diameter, Evolution). Rapid recent changes, bleeding, or ulceration should be evaluated in-person by dermatology promptly."
+    },
+    {
+      "id": "chest_symptom_warning",
+      "keywords": ["胸痛", "胸闷", "呼吸困难", "heart attack", "chest pain", "shortness of breath"],
+      "zh_answer": "胸痛/呼吸困难属于高风险症状。请立即停止活动并尽快前往急诊或呼叫120，不建议仅在线观察。",
+      "en_answer": "Chest pain or shortness of breath are high-risk symptoms. Stop activity and seek emergency care immediately; online advice alone is not enough."
+    },
+    {
+      "id": "medication_safety",
+      "keywords": ["用药", "药物", "副作用", "药物相互作用", "medication", "side effect", "drug interaction"],
+      "zh_answer": "请不要自行叠加或加量用药。建议核对药品说明书、记录当前所有药物名称与剂量；若出现皮疹、呼吸困难、意识异常等疑似严重不良反应，应立即就医。",
+      "en_answer": "Avoid self-escalating or combining medications without guidance. Verify labels, keep a current medication list, and seek urgent care for serious adverse effects such as rash, breathing difficulty, or altered consciousness."
+    }
+  ]
+}
