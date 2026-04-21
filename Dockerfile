@@ -34,7 +34,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # Create necessary directories
-RUN mkdir -p uploads/backend uploads/frontend uploads/speech data
+RUN mkdir -p uploads/backend uploads/frontend uploads/skin_lesion_output uploads/speech data
 
 # Expose port
 EXPOSE 8000

@@ -43,7 +43,7 @@ class ImageClassifier:
                 {"type": "text", "text": (
                     """
                     Determine if this is a medical image. If it is, classify it as:
-                    'BRAIN MRI SCAN' or 'OTHER'. If it's not a medical image, return 'NON-MEDICAL'.
+                    'BRAIN MRI SCAN', 'CHEST X-RAY', 'SKIN LESION', or 'OTHER'. If it's not a medical image, return 'NON-MEDICAL'.
                     You must provide your answer in JSON format with the following structure:
                     {{
                     "image_type": "IMAGE TYPE",

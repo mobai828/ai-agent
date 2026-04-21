@@ -37,10 +37,11 @@ app = FastAPI(title="Multi-Agent Medical Chatbot", version="2.0")
 # Set up directories
 UPLOAD_FOLDER = "uploads/backend"
 FRONTEND_UPLOAD_FOLDER = "uploads/frontend"
+SKIN_LESION_OUTPUT = "uploads/skin_lesion_output"
 SPEECH_DIR = "uploads/speech"
 
 # Create directories if they don't exist
-for directory in [UPLOAD_FOLDER, FRONTEND_UPLOAD_FOLDER, SPEECH_DIR]:
+for directory in [UPLOAD_FOLDER, FRONTEND_UPLOAD_FOLDER, SKIN_LESION_OUTPUT, SPEECH_DIR]:
     os.makedirs(directory, exist_ok=True)
 
 # Mount static files directory
@@ -147,11 +148,6 @@ def chat(
     # Generate session ID for cookie if it doesn't exist
     if not session_id:
         session_id = str(uuid.uuid4())
-
-    # Set session cookie
-    response.set_cookie(key="session_id", value=session_id)
-
-    # Force offline mode for fully disconnected deployments
     if config.api.force_offline_mode:
         return _build_offline_response(
             query=request.query,
@@ -163,19 +159,30 @@ def chat(
         response_data = process_query(request.query, language=request.language, preferred_agent=request.preferred_agent)
         response_text = _extract_response_text(response_data)
 
-        # If online pipeline returns empty output, still fallback gracefully.
-        if not response_text.strip():
-            return _build_offline_response(
-                query=request.query,
-                language=request.language,
-                reason="empty_online_response"
-            )
+        # Set session cookie
+        response.set_cookie(key="session_id", value=session_id)
 
+        # Check if the agent is skin lesion segmentation and find the image path
         result = {
             "status": "success",
             "response": response_text,
             "agent": response_data.get("agent_name", "UNKNOWN_AGENT")
         }
+
+        # If it's the skin lesion segmentation agent, check for output image
+        if response_data.get("agent_name") == "SKIN_LESION_AGENT, HUMAN_VALIDATION":
+            segmentation_path = os.path.join(SKIN_LESION_OUTPUT, "segmentation_plot.png")
+            if os.path.exists(segmentation_path):
+                result["result_image"] = f"/uploads/skin_lesion_output/segmentation_plot.png"
+            else:
+                print("Skin Lesion Output path does not exist.")
+
+        if not response_text.strip() and config.api.enable_offline_fallback:
+            return _build_offline_response(
+                query=request.query,
+                language=request.language,
+                reason="empty_online_response"
+            )
 
         return result
     except Exception as e:
@@ -231,35 +238,42 @@ async def upload_image(
     file_path = os.path.join(UPLOAD_FOLDER, filename)
     with open(file_path, "wb") as f:
         f.write(file_content)
-
-    # Set session cookie
-    response.set_cookie(key="session_id", value=session_id)
+    if config.api.force_offline_mode:
+        return _build_offline_response(
+            query={"text": text, "image": file_path},
+            language=language,
+            reason="force_offline_mode_enabled"
+        )
 
     try:
         query = {"text": text, "image": file_path}
-
-        if config.api.force_offline_mode:
-            return _build_offline_response(
-                query=query,
-                language=language,
-                reason="force_offline_mode_enabled"
-            )
-
         response_data = process_query(query, language=language, preferred_agent=preferred_agent)
         response_text = _extract_response_text(response_data)
 
-        if not response_text.strip():
-            return _build_offline_response(
-                query=query,
-                language=language,
-                reason="empty_online_response"
-            )
+        # Set session cookie
+        response.set_cookie(key="session_id", value=session_id)
 
+        # Check if the agent is skin lesion segmentation and find the image path
         result = {
             "status": "success",
             "response": response_text,
             "agent": response_data.get("agent_name", "UNKNOWN_AGENT")
         }
+
+        # If it's the skin lesion segmentation agent, check for output image
+        if response_data.get("agent_name") == "SKIN_LESION_AGENT, HUMAN_VALIDATION":
+            segmentation_path = os.path.join(SKIN_LESION_OUTPUT, "segmentation_plot.png")
+            if os.path.exists(segmentation_path):
+                result["result_image"] = f"/uploads/skin_lesion_output/segmentation_plot.png"
+            else:
+                print("Skin Lesion Output path does not exist.")
+
+        if not response_text.strip() and config.api.enable_offline_fallback:
+            return _build_offline_response(
+                query=query,
+                language=language,
+                reason="empty_online_response"
+            )
 
         return result
     except Exception as e:

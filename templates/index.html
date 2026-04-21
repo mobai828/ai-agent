@@ -135,59 +135,6 @@
             filter: alpha(opacity=0);
         }
 
-        .cv-upload-card {
-            border: 2px dashed #9ec5fe;
-            border-radius: 14px;
-            background: linear-gradient(135deg, #f1f7ff 0%, #ffffff 60%);
-            padding: 16px;
-        }
-
-        .cv-upload-trigger {
-            width: 100%;
-            border: 1px solid #cfe2ff;
-            border-radius: 12px;
-            background-color: #fff;
-            color: #0b5ed7;
-            font-weight: 600;
-            padding: 10px 12px;
-            transition: all 0.2s ease;
-        }
-
-        .cv-upload-trigger:hover {
-            background-color: #e7f1ff;
-            border-color: #9ec5fe;
-        }
-
-        .cv-upload-hint {
-            margin-top: 8px;
-            font-size: 0.85rem;
-            color: #6c757d;
-        }
-
-        .cv-only-mode {
-            display: block !important;
-        }
-
-        .cv-only-mode .file-upload-container {
-            width: 100%;
-            margin-right: 0 !important;
-        }
-
-        .cv-only-mode .file-upload-btn {
-            width: 100%;
-            height: 44px;
-            border-radius: 12px;
-            background-color: #fff;
-            border: 1px solid #cfe2ff;
-            color: #0b5ed7;
-            font-weight: 600;
-        }
-
-        .cv-only-mode .file-upload-btn:hover {
-            background-color: #e7f1ff;
-            border-color: #9ec5fe;
-        }
-
         .preview-container {
             margin-top: 10px;
             display: none;
@@ -351,7 +298,12 @@
                     <h6>Computer Vision Agents</h6>
                     <ul class="list-unstyled agent-list">
                         <li data-agent="BRAIN_TUMOR_AGENT"><i class="fas fa-brain me-2"></i> Brain Tumor Detection</li>
-                        <li data-agent="STROKE_AGENT"><i class="fas fa-brain me-2"></i> Stroke Detection (Reserved)</li>
+                        <li data-agent="CHEST_XRAY_AGENT"><i class="fas fa-lungs me-2"></i> Chest X-ray Covid-19
+                            Classification
+                        </li>
+                        <li data-agent="SKIN_LESION_AGENT"><i class="fas fa-allergies me-2"></i> Skin Lesion
+                            Segmentation
+                        </li>
                     </ul>
                 </div>
                 <div class="agent-info">
@@ -373,7 +325,7 @@
                         </li>
                         <li><strong>Computer Vision Agents:</strong>
                             <ul>
-                                <li class="cv-cap1">Brain MRI analysis support</li>
+                                <li class="cv-cap1">Lesion detection & classification</li>
                                 <li class="cv-cap2">PyTorch based inference</li>
                             </ul>
                         </li>
@@ -427,7 +379,7 @@
                 <div class="chat-footer">
                     <form id="chat-form" class="d-flex align-items-end">
                         <div class="file-upload-container me-2">
-                            <button type="button" class="file-upload-btn btn btn-primary" id="image-upload-btn">
+                            <button type="button" class="file-upload-btn btn btn-primary">
                                 <i class="fas fa-paperclip"></i>
                             </button>
                             <input type="file" class="file-upload-input" id="image-upload" accept="image/*">
@@ -451,7 +403,6 @@
                             <i class="fas fa-paper-plane"></i>
                         </button>
                     </form>
-                    <div class="cv-upload-hint d-none" id="upload-hint">Only image files are supported. Text input is disabled.</div>
                 </div>
             </div>
         </div>
@@ -652,9 +603,9 @@
 
     //             // Add result image if it exists
     //             if (data.result_image) {
-    //                 // If an image-specific result is returned and both the user uploaded
+    //                 // If the skin lesion segmentation agent was used and both the user uploaded
     //                 // an image and we have a result image, display them side by side
-    //                 if (data.agent === "BRAIN_TUMOR_AGENT, HUMAN_VALIDATION" && imageDataUrl) {
+    //                 if (data.agent === "SKIN_LESION_AGENT, HUMAN_VALIDATION" && imageDataUrl) {
     //                     assistantHtml += `
     //                         <div class="image-side-by-side">
     //                             <div class="image-container">
@@ -1145,7 +1096,7 @@
             'medRagCap4': 'Qdrant Vector DB hybrid search',
             'webCap1': 'Real-time Tavily search',
             'webCap2': 'Reliable medical sources filtering',
-            'cvCap1': 'Brain MRI analysis support',
+            'cvCap1': 'Lesion detection & classification',
             'cvCap2': 'PyTorch based inference',
             'cvCap3': 'Medical image processing',
             'humanValCap': 'Human verification for CV agents',
@@ -1158,16 +1109,13 @@
             'webSearchAgent': 'Web Search Agent',
             'cvAgents': 'Computer Vision Agents',
             'brainTumor': 'Brain Tumor Detection',
-            'strokeAgent': 'Stroke Detection',
+            'chestXray': 'Chest X-ray Covid-19 Classification',
+            'skinLesion': 'Skin Lesion Segmentation',
             'clearConv': 'Clear Conversation',
             'headerTitle': 'Multi-Agent Medical Assistant',
-            'headerSubtitle': 'Upload medical images for AI-assisted analysis',
-            'systemMsg': 'Hello! Please upload a medical image. The workflow is image upload, segmentation, lesion marking, and AI-assisted diagnosis.',
+            'headerSubtitle': 'Upload medical images or ask health-related questions',
+            'systemMsg': 'Hello! I\'m your medical assistant. You can ask me health-related questions or upload medical images for analysis.',
             'inputPlaceholder': 'Ask a medical question...',
-            'uploadTrigger': 'Upload Medical Image',
-            'uploadHint': 'Only image files are supported. Text input is disabled.',
-            'uploading': 'Image uploaded. Sending for analysis...',
-            'strokeReserved': 'Stroke detection interface is reserved. Feature implementation is pending.',
             'playVoice': 'Play Voice Response',
             'humanValReq': '⚠️ Human Validation Required: Do you agree with this result?',
             'valYes': '✔ Yes',
@@ -1193,7 +1141,7 @@
             'medRagCap4': 'Qdrant 向量数据库混合搜索',
             'webCap1': '基于 Tavily 的实时网络搜索',
             'webCap2': '可靠医学文献及信息过滤',
-            'cvCap1': '脑部 MRI 图像分析支持',
+            'cvCap1': '医学病灶检测与分类',
             'cvCap2': '基于 PyTorch 的深度学习推理',
             'cvCap3': '医学图像处理',
             'humanValCap': '针对计算机视觉的人工验证（HITL）',
@@ -1206,16 +1154,13 @@
             'webSearchAgent': '网络搜索智能体',
             'cvAgents': '计算机视觉智能体',
             'brainTumor': '脑肿瘤检测',
-            'strokeAgent': '脑卒中检测',
+            'chestXray': '胸部X光新冠肺炎分类',
+            'skinLesion': '皮肤病变分割',
             'clearConv': '清空对话',
             'headerTitle': '多智能体医疗助手',
-            'headerSubtitle': '上传医学图像进行AI辅助分析',
-            'systemMsg': '你好！请上传医学图像。流程为图像上传、图像分割、病灶标记和AI辅助诊断。',
+            'headerSubtitle': '上传医学图像或询问健康相关问题',
+            'systemMsg': '你好！我是你的医疗助手。你可以问我健康相关的问题，或者上传医学图像进行分析。',
             'inputPlaceholder': '询问医学问题...',
-            'uploadTrigger': '上传医学图像',
-            'uploadHint': '仅支持图片文件上传，已禁用文字输入。',
-            'uploading': '图片已上传，正在提交分析...',
-            'strokeReserved': '脑卒中检测接口已预留，功能待实现。',
             'playVoice': '播放语音回复',
             'humanValReq': '⚠️ 需要人工验证：您同意这个结果吗？',
             'valYes': '✔ 是',
@@ -1251,13 +1196,14 @@
             }
 
             const listItems = sidebar.querySelectorAll('li[data-agent]');
-            if (listItems.length >= 6) {
+            if (listItems.length >= 7) {
                 listItems[0].innerHTML = `<i class="fas fa-robot me-2"></i> ${t.autoRoute}`;
                 listItems[1].innerHTML = `<i class="fas fa-comment-medical me-2"></i> ${t.medConvAgent}`;
                 listItems[2].innerHTML = `<i class="fas fa-database me-2"></i> ${t.medRagAgent}`;
                 listItems[3].innerHTML = `<i class="fas fa-search me-2"></i> ${t.webSearchAgent}`;
                 listItems[4].innerHTML = `<i class="fas fa-brain me-2"></i> ${t.brainTumor}`;
-                listItems[5].innerHTML = `<i class="fas fa-brain me-2"></i> ${t.strokeAgent}`;
+                listItems[5].innerHTML = `<i class="fas fa-lungs me-2"></i> ${t.chestXray}`;
+                listItems[6].innerHTML = `<i class="fas fa-allergies me-2"></i> ${t.skinLesion}`;
             }
 
             // Capabilities Update
@@ -1313,9 +1259,8 @@
         document.getElementById('header-title').innerHTML = `<i class="fas fa-stethoscope me-2"></i>${t.headerTitle}`;
         document.getElementById('header-subtitle').innerText = t.headerSubtitle;
 
+        // Input
         document.getElementById('message-input').placeholder = t.inputPlaceholder;
-        const uploadHint = document.getElementById('upload-hint');
-        if (uploadHint) uploadHint.innerText = t.uploadHint;
 
         // Initial system message (if exists)
         const initialMsg = document.getElementById('initial-system-msg');
@@ -1334,9 +1279,6 @@
         const chatForm = document.getElementById('chat-form');
         const messageInput = document.getElementById('message-input');
         const imageUpload = document.getElementById('image-upload');
-        const imageUploadBtn = document.getElementById('image-upload-btn');
-        const submitBtn = chatForm.querySelector('button[type="submit"]');
-        const uploadHint = document.getElementById('upload-hint');
         const previewContainer = document.getElementById('preview-container');
         const previewImage = document.getElementById('preview-image');
         const removeImageBtn = document.getElementById('remove-image');
@@ -1345,7 +1287,6 @@
             currentLanguage = currentLanguage === 'en' ? 'zh' : 'en';
             localStorage.setItem('language', currentLanguage);
             updateUIForLanguage();
-            updateInputModeByAgent();
         });
 
         // Initialize UI text
@@ -1366,12 +1307,8 @@
                 const agentName = this.innerText.trim();
                 showToast(translations[currentLanguage].agentChanged + agentName, 'success');
                 console.log("Selected Agent:", currentSelectedAgent);
-                updateInputModeByAgent();
             });
         });
-
-        // We only maintain display messages
-        let displayMessages = [];
 
         // Add voice recording button to the UI
         const fileUploadContainer = document.querySelector('.file-upload-container');
@@ -1384,29 +1321,6 @@
 
         const voiceRecordBtn = document.getElementById('voice-record-btn');
 
-        function isCvOnlyAgent(agent) {
-            return agent === 'BRAIN_TUMOR_AGENT' || agent === 'STROKE_AGENT';
-        }
-
-        function updateInputModeByAgent() {
-            const cvOnly = isCvOnlyAgent(currentSelectedAgent);
-            if (cvOnly) {
-                chatForm.classList.add('cv-upload-card', 'cv-only-mode');
-                messageInput.classList.add('d-none');
-                submitBtn.classList.add('d-none');
-                voiceRecordBtn.classList.add('d-none');
-                uploadHint.classList.remove('d-none');
-                imageUploadBtn.innerHTML = `<i class="fas fa-image me-2"></i>${translations[currentLanguage].uploadTrigger}`;
-            } else {
-                chatForm.classList.remove('cv-upload-card', 'cv-only-mode');
-                messageInput.classList.remove('d-none');
-                submitBtn.classList.remove('d-none');
-                voiceRecordBtn.classList.remove('d-none');
-                uploadHint.classList.add('d-none');
-                imageUploadBtn.innerHTML = '<i class="fas fa-paperclip"></i>';
-            }
-        }
-
         // Voice recording functionality
         voiceRecordBtn.addEventListener('click', toggleRecording);
 
@@ -1417,7 +1331,9 @@
         } catch (e) {
             console.error('Web Audio API is not supported in this browser');
         }
-        updateInputModeByAgent();
+
+        // We only maintain display messages
+        let displayMessages = [];
 
         // Auto-resize textarea
         messageInput.addEventListener('input', function () {
@@ -1429,19 +1345,11 @@
         imageUpload.addEventListener('change', function (e) {
             if (e.target.files.length > 0) {
                 const file = e.target.files[0];
-                if (!file.type.startsWith('image/')) {
-                    showToast(translations[currentLanguage].uploadHint, 'danger');
-                    imageUpload.value = '';
-                    return;
-                }
                 const reader = new FileReader();
 
                 reader.onload = function (e) {
                     previewImage.src = e.target.result;
                     previewContainer.style.display = 'block';
-                    if (isCvOnlyAgent(currentSelectedAgent)) {
-                        chatForm.dispatchEvent(new Event('submit'));
-                    }
                 };
 
                 reader.readAsDataURL(file);
@@ -1471,12 +1379,9 @@
         chatForm.addEventListener('submit', async function (e) {
             e.preventDefault();
 
+            // Get message from input or transcribed text
             const message = messageInput.value.trim();
             if (!message && !imageUpload.files.length) return;
-            if ((currentSelectedAgent === 'BRAIN_TUMOR_AGENT' || currentSelectedAgent === 'STROKE_AGENT') && !imageUpload.files.length) {
-                showToast(currentLanguage === 'zh' ? '该视觉智能体请先上传图片。' : 'Please upload an image for this vision agent.', 'danger');
-                return;
-            }
 
             // --- ADDED: Automatically stop any playing audio immediately when submitting ---
             if (currentAudio) {
@@ -1511,7 +1416,7 @@
             userMessageElement.className = 'message user-message';
 
             // Create message content with image if available
-            let messageContent = `<p>${message || translations[currentLanguage].uploadTrigger}</p>`;
+            let messageContent = `<p>${message}</p>`;
             if (imageDataUrl) {
                 messageContent += `
                         <div class="mt-2">
@@ -1543,11 +1448,9 @@
             try {
                 let response;
 
-                if (currentSelectedAgent === 'STROKE_AGENT') {
-                    throw new Error(translations[currentLanguage].strokeReserved);
-                }
-
+                // Check if there's an image or just text
                 if (imageUpload.files.length > 0) {
+                    // Create form data for image upload with optional text
                     const formData = new FormData();
                     formData.append('text', message);
                     formData.append('image', imageUpload.files[0]);
@@ -1569,11 +1472,11 @@
                         },
                         body: JSON.stringify({
                             query: message,
-                            conversation_history: [],
+                            conversation_history: [], // You might want to maintain this if needed
                             language: currentLanguage,
                             preferred_agent: currentSelectedAgent
                         }),
-                        credentials: 'include'
+                        credentials: 'include' // Important for cookie handling
                     });
                 }
 
@@ -1625,11 +1528,29 @@
 
                 // Add result image if it exists
                 if (data.result_image) {
-                    assistantHtml += `
-                            <div class="mt-3">
-                                <img src="${data.result_image}" alt="Result image" class="result-image">
-                            </div>
-                        `;
+                    // If the skin lesion segmentation agent was used and both the user uploaded
+                    // an image and we have a result image, display them side by side
+                    if (data.agent === "SKIN_LESION_AGENT, HUMAN_VALIDATION" && imageDataUrl) {
+                        assistantHtml += `
+                                <div class="image-side-by-side">
+                                    <div class="image-container">
+                                        <img src="${imageDataUrl}" alt="Original image" class="img-fluid rounded">
+                                        <div class="image-caption">${translations[currentLanguage].origImage}</div>
+                                    </div>
+                                    <div class="image-container">
+                                        <img src="${data.result_image}" alt="Segmented image" class="img-fluid rounded">
+                                        <div class="image-caption">${translations[currentLanguage].segResult}</div>
+                                    </div>
+                                </div>
+                            `;
+                    } else {
+                        // Otherwise just show the result image
+                        assistantHtml += `
+                                <div class="mt-3">
+                                    <img src="${data.result_image}" alt="Result image" class="result-image">
+                                </div>
+                            `;
+                    }
                 }
 
                 assistantMessageElement.innerHTML = assistantHtml;
@@ -1793,7 +1714,6 @@
                 chatForm.dispatchEvent(new Event('submit'));
             }
         });
-
     });
 
     // Speech Recorder button function
