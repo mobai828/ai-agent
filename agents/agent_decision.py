@@ -58,11 +58,10 @@ class AgentConfig:
 
     Available agents:
     1. CONVERSATION_AGENT - For general chat, greetings, and non-medical questions.
-    2. RAG_AGENT - For specific medical knowledge questions that can be answered from established medical literature. Currently ingested medical knowledge involves 'introduction to brain tumor', 'deep learning techniques to diagnose and detect brain tumors', 'deep learning techniques to diagnose and detect covid / covid-19 from chest x-ray'.
+    2. RAG_AGENT - For specific medical knowledge questions that can be answered from established medical literature. Currently ingested medical knowledge involves 'introduction to brain tumor' and 'deep learning techniques to diagnose and detect brain tumors'.
     3. WEB_SEARCH_PROCESSOR_AGENT - For questions about recent medical developments, current outbreaks, or time-sensitive medical information.
     4. BRAIN_TUMOR_AGENT - For analysis of brain MRI images to detect and segment tumors.
-    5. CHEST_XRAY_AGENT - For analysis of chest X-ray images to detect abnormalities.
-    6. SKIN_LESION_AGENT - For analysis of skin lesion images to classify them as benign or malignant.
+    5. BRAIN_STROKE_AGENT - For analysis of brain imaging to detect and assess stroke lesions.
 
     Make your decision based on these guidelines:
     - If the user has not uploaded any image, always route to the conversation agent.
@@ -476,12 +475,81 @@ def create_agent_graph():
             return "WEB_SEARCH_PROCESSOR_AGENT"  # Correct format
         return "check_validation"  # No transition needed if confidence is high and info is sufficient
     
+    def _format_cv_pipeline_response(result: Dict, language: str, agent_display_en: str, agent_display_zh: str) -> AIMessage:
+        """Format reserved-interface CV agent (brain tumor / stroke) pipeline result into user-facing message."""
+        status = result.get("status", "not_implemented")
+        stages = result.get("stages", {})
+        message = result.get("message", "")
+        diagnosis = result.get("diagnosis", "")
+
+        if language == "zh":
+            stage_names = {
+                "segmentation": "图像分割",
+                "lesion_marking": "病灶标记",
+                "ai_diagnosis": "AI 辅助诊断",
+            }
+            header = f"### {agent_display_zh} 分析流程"
+            pending_text = "（待接入）"
+            done_text = "（已完成）"
+        else:
+            stage_names = {
+                "segmentation": "Image Segmentation",
+                "lesion_marking": "Lesion Marking",
+                "ai_diagnosis": "AI-Assisted Diagnosis",
+            }
+            header = f"### {agent_display_en} Pipeline"
+            pending_text = "(pending)"
+            done_text = "(completed)"
+
+        lines = [header, ""]
+        for key in ("segmentation", "lesion_marking", "ai_diagnosis"):
+            done = stages.get(key, False)
+            mark = "✅" if done else "⏳"
+            suffix = done_text if done else pending_text
+            lines.append(f"- {mark} **{stage_names[key]}** {suffix}")
+
+        if diagnosis:
+            lines.append("")
+            lines.append(diagnosis)
+        elif message:
+            lines.append("")
+            lines.append(f"> {message}")
+
+        if status == "not_implemented":
+            if language == "zh":
+                lines.append("")
+                lines.append("_当前算法接口预留中，正式模型接入后将自动返回分割掩膜、病灶标记图以及 AI 辅助诊断结论。_")
+            else:
+                lines.append("")
+                lines.append("_The algorithm interface is reserved. Once the model is integrated, the pipeline will return a segmentation mask, a lesion-marked image, and an AI diagnosis._")
+
+        return AIMessage(content="\n".join(lines))
+
     def run_brain_tumor_agent(state: AgentState) -> AgentState:
-        """Handle brain MRI image analysis."""
+        """Handle brain MRI image analysis (reserved interface)."""
 
         print(f"Selected agent: BRAIN_TUMOR_AGENT")
 
-        response = AIMessage(content="This would be handled by the brain tumor agent, analyzing the MRI image.")
+        current_input = state["current_input"]
+        image_path = current_input.get("image", None) if isinstance(current_input, dict) else None
+        language = state.get("language", "en")
+
+        if image_path:
+            pipeline_result = AgentConfig.image_analyzer.detect_brain_tumor(image_path)
+        else:
+            pipeline_result = {
+                "status": "error",
+                "stages": {"segmentation": False, "lesion_marking": False, "ai_diagnosis": False},
+                "diagnosis": "",
+                "message": "未接收到图像，无法执行脑肿瘤检测。" if language == "zh" else "No image received for brain tumor detection.",
+            }
+
+        response = _format_cv_pipeline_response(
+            pipeline_result,
+            language=language,
+            agent_display_en="Brain Tumor Detection",
+            agent_display_zh="脑肿瘤检测",
+        )
 
         return {
             **state,
@@ -489,72 +557,38 @@ def create_agent_graph():
             "needs_human_validation": True,  # Medical diagnosis always needs validation
             "agent_name": "BRAIN_TUMOR_AGENT"
         }
-    
-    def run_chest_xray_agent(state: AgentState) -> AgentState:
-        """Handle chest X-ray image analysis."""
+
+    def run_brain_stroke_agent(state: AgentState) -> AgentState:
+        """Handle brain stroke image analysis (reserved interface)."""
+
+        print(f"Selected agent: BRAIN_STROKE_AGENT")
 
         current_input = state["current_input"]
-        image_path = current_input.get("image", None)
+        image_path = current_input.get("image", None) if isinstance(current_input, dict) else None
+        language = state.get("language", "en")
 
-        print(f"Selected agent: CHEST_XRAY_AGENT")
-
-        # classify chest x-ray into covid or normal
-        predicted_class = AgentConfig.image_analyzer.classify_chest_xray(image_path)
-
-        if predicted_class == "covid19":
-            response_text = "The analysis of the uploaded chest X-ray image indicates a **POSITIVE** result for **COVID-19**."
-            if state.get("language", "en") == "zh":
-                response_text = "对上传的胸部X光图像分析表明，**COVID-19（新冠肺炎）** 结果为 **阳性**。"
-            response = AIMessage(content=response_text)
-        elif predicted_class == "normal":
-            response_text = "The analysis of the uploaded chest X-ray image indicates a **NEGATIVE** result for **COVID-19**, i.e., **NORMAL**."
-            if state.get("language", "en") == "zh":
-                response_text = "对上传的胸部X光图像分析表明，**COVID-19（新冠肺炎）** 结果为 **阴性**，即 **正常**。"
-            response = AIMessage(content=response_text)
+        if image_path:
+            pipeline_result = AgentConfig.image_analyzer.detect_brain_stroke(image_path)
         else:
-            response_text = "The uploaded image is not clear enough to make a diagnosis / the image is not a medical image."
-            if state.get("language", "en") == "zh":
-                response_text = "上传的图像不够清晰，无法进行诊断 / 该图像不是医学图像。"
-            response = AIMessage(content=response_text)
+            pipeline_result = {
+                "status": "error",
+                "stages": {"segmentation": False, "lesion_marking": False, "ai_diagnosis": False},
+                "diagnosis": "",
+                "message": "未接收到图像，无法执行脑卒中检测。" if language == "zh" else "No image received for brain stroke detection.",
+            }
 
-        # response = AIMessage(content="This would be handled by the chest X-ray agent, analyzing the image.")
+        response = _format_cv_pipeline_response(
+            pipeline_result,
+            language=language,
+            agent_display_en="Brain Stroke Detection",
+            agent_display_zh="脑卒中检测",
+        )
 
         return {
             **state,
             "output": response,
             "needs_human_validation": True,  # Medical diagnosis always needs validation
-            "agent_name": "CHEST_XRAY_AGENT"
-        }
-    
-    def run_skin_lesion_agent(state: AgentState) -> AgentState:
-        """Handle skin lesion image analysis."""
-
-        current_input = state["current_input"]
-        image_path = current_input.get("image", None)
-
-        print(f"Selected agent: SKIN_LESION_AGENT")
-
-        # classify chest x-ray into covid or normal
-        predicted_mask = AgentConfig.image_analyzer.segment_skin_lesion(image_path)
-
-        if predicted_mask:
-            response_text = "Following is the analyzed **segmented** output of the uploaded skin lesion image:"
-            if state.get("language", "en") == "zh":
-                response_text = "以下是上传的皮肤病变图像经过 **分割** 分析后的结果："
-            response = AIMessage(content=response_text)
-        else:
-            response_text = "The uploaded image is not clear enough to make a diagnosis / the image is not a medical image."
-            if state.get("language", "en") == "zh":
-                response_text = "上传的图像不够清晰，无法进行诊断 / 该图像不是医学图像。"
-            response = AIMessage(content=response_text)
-
-        # response = AIMessage(content="This would be handled by the skin lesion agent, analyzing the skin image.")
-
-        return {
-            **state,
-            "output": response,
-            "needs_human_validation": True,  # Medical diagnosis always needs validation
-            "agent_name": "SKIN_LESION_AGENT"
+            "agent_name": "BRAIN_STROKE_AGENT"
         }
     
     def handle_human_validation(state: AgentState) -> Dict:
@@ -655,8 +689,7 @@ def create_agent_graph():
     workflow.add_node("RAG_AGENT", run_rag_agent)
     workflow.add_node("WEB_SEARCH_PROCESSOR_AGENT", run_web_search_processor_agent)
     workflow.add_node("BRAIN_TUMOR_AGENT", run_brain_tumor_agent)
-    workflow.add_node("CHEST_XRAY_AGENT", run_chest_xray_agent)
-    workflow.add_node("SKIN_LESION_AGENT", run_skin_lesion_agent)
+    workflow.add_node("BRAIN_STROKE_AGENT", run_brain_stroke_agent)
     workflow.add_node("check_validation", handle_human_validation)
     workflow.add_node("human_validation", perform_human_validation)
     workflow.add_node("apply_guardrails", apply_output_guardrails)
@@ -683,8 +716,7 @@ def create_agent_graph():
             "RAG_AGENT": "RAG_AGENT",
             "WEB_SEARCH_PROCESSOR_AGENT": "WEB_SEARCH_PROCESSOR_AGENT",
             "BRAIN_TUMOR_AGENT": "BRAIN_TUMOR_AGENT",
-            "CHEST_XRAY_AGENT": "CHEST_XRAY_AGENT",
-            "SKIN_LESION_AGENT": "SKIN_LESION_AGENT",
+            "BRAIN_STROKE_AGENT": "BRAIN_STROKE_AGENT",
             "needs_validation": "RAG_AGENT"  # Default to RAG if confidence is low
         }
     )
@@ -695,8 +727,7 @@ def create_agent_graph():
     workflow.add_edge("WEB_SEARCH_PROCESSOR_AGENT", "check_validation")
     workflow.add_conditional_edges("RAG_AGENT", confidence_based_routing)
     workflow.add_edge("BRAIN_TUMOR_AGENT", "check_validation")
-    workflow.add_edge("CHEST_XRAY_AGENT", "check_validation")
-    workflow.add_edge("SKIN_LESION_AGENT", "check_validation")
+    workflow.add_edge("BRAIN_STROKE_AGENT", "check_validation")
 
     workflow.add_edge("human_validation", "apply_guardrails")
     workflow.add_edge("apply_guardrails", END)

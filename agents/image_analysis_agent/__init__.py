@@ -1,33 +1,45 @@
 from .image_classifier import ImageClassifier
-from .chest_xray_agent.covid_chest_xray_inference import ChestXRayClassification
-# from .brain_tumor_agent.brain_tumor_inference import BrainTumorAgent
-from .skin_lesion_agent.skin_lesion_inference import SkinLesionSegmentation
+from .brain_tumor_agent.brain_tumor_inference import BrainTumorAgent
+from .brain_stroke_agent.brain_stroke_inference import BrainStrokeAgent
+
 
 class ImageAnalysisAgent:
     """
     Agent responsible for processing image uploads and classifying them as medical or non-medical, and determining their type.
     """
-    
+
     def __init__(self, config):
         self.image_classifier = ImageClassifier(vision_model=config.medical_cv.llm)
-        self.chest_xray_agent = ChestXRayClassification(model_path=config.medical_cv.chest_xray_model_path)
-        # self.brain_tumor_agent = BrainTumorAgent()
-        self.skin_lesion_agent = SkinLesionSegmentation(model_path=config.medical_cv.skin_lesion_model_path)
-        self.skin_lesion_segmentation_output_path = config.medical_cv.skin_lesion_segmentation_output_path
-    
+
+        # Reserved-interface CV agents (actual algorithms implemented by another team)
+        self.brain_tumor_agent = BrainTumorAgent(
+            model_path=getattr(config.medical_cv, "brain_tumor_model_path", None),
+            output_dir=getattr(config.medical_cv, "brain_tumor_output_dir", None),
+        )
+        self.brain_stroke_agent = BrainStrokeAgent(
+            model_path=getattr(config.medical_cv, "brain_stroke_model_path", None),
+            output_dir=getattr(config.medical_cv, "brain_stroke_output_dir", None),
+        )
+        self.brain_tumor_output_path = getattr(
+            config.medical_cv,
+            "brain_tumor_output_path",
+            "./uploads/brain_tumor_output/brain_tumor_plot.png",
+        )
+        self.brain_stroke_output_path = getattr(
+            config.medical_cv,
+            "brain_stroke_output_path",
+            "./uploads/brain_stroke_output/brain_stroke_plot.png",
+        )
+
     # classify image
     def analyze_image(self, image_path: str) -> str:
         """Classifies images as medical or non-medical and determines their type."""
         return self.image_classifier.classify_image(image_path)
-    
-    # chest x-ray agent
-    def classify_chest_xray(self, image_path: str) -> str:
-        return self.chest_xray_agent.predict(image_path)
-    
-    # # brain tumor agent
-    # def classify_brain_tumor(self, image_path: str) -> str:
-    #     return self.brain_tumor_agent.predict(image_path)
-    
-    # skin lesion agent
-    def segment_skin_lesion(self, image_path: str) -> str:
-        return self.skin_lesion_agent.predict(image_path, self.skin_lesion_segmentation_output_path)
+
+    # brain tumor agent (reserved interface)
+    def detect_brain_tumor(self, image_path: str) -> dict:
+        return self.brain_tumor_agent.predict(image_path, self.brain_tumor_output_path)
+
+    # brain stroke agent (reserved interface)
+    def detect_brain_stroke(self, image_path: str) -> dict:
+        return self.brain_stroke_agent.predict(image_path, self.brain_stroke_output_path)

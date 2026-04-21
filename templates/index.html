@@ -268,6 +268,122 @@
         .message tr:hover {
             background-color: #f0f0f0;
         }
+
+        /* ============================================================
+           CV Agent (Brain Tumor / Stroke) image-only upload panel
+           - Replaces the normal chat input when a brain CV agent is
+             selected. Designed to be visually distinctive from the
+             paperclip upload button in the "Available Agents" list.
+           ============================================================ */
+        .cv-upload-panel {
+            padding: 12px 8px 8px;
+        }
+
+        .cv-dropzone {
+            position: relative;
+            border: 2px dashed #b8daff;
+            background: linear-gradient(135deg, #f0f7ff 0%, #eaf4ff 100%);
+            border-radius: 18px;
+            padding: 28px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.25s ease;
+            overflow: hidden;
+        }
+
+        .cv-dropzone::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at 50% 30%, rgba(13, 110, 253, 0.08), transparent 60%);
+            pointer-events: none;
+        }
+
+        .cv-dropzone:hover,
+        .cv-dropzone.is-dragover {
+            border-color: #0d6efd;
+            background: linear-gradient(135deg, #e3efff 0%, #d7e8ff 100%);
+            transform: translateY(-1px);
+            box-shadow: 0 6px 18px rgba(13, 110, 253, 0.12);
+        }
+
+        .cv-upload-icon {
+            font-size: 2.4rem;
+            color: #0d6efd;
+            margin-bottom: 10px;
+            filter: drop-shadow(0 2px 4px rgba(13, 110, 253, 0.25));
+        }
+
+        .cv-upload-title {
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: #0d6efd;
+            margin-bottom: 4px;
+        }
+
+        .cv-upload-hint {
+            font-size: 0.85rem;
+            color: #6c757d;
+        }
+
+        .cv-upload-stages {
+            display: flex;
+            justify-content: center;
+            gap: 14px;
+            margin-top: 14px;
+            flex-wrap: wrap;
+        }
+
+        .cv-upload-stages .stage-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.78rem;
+            color: #0d6efd;
+            background: #ffffffcc;
+            border: 1px solid #cfe1ff;
+            padding: 4px 10px;
+            border-radius: 999px;
+        }
+
+        .cv-upload-stages .stage-chip i {
+            font-size: 0.75rem;
+        }
+
+        .cv-preview {
+            margin-top: 12px;
+            padding: 14px;
+            background: #ffffff;
+            border: 1px solid #e3e8ef;
+            border-radius: 14px;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+        }
+
+        .cv-preview img {
+            max-width: 100%;
+            max-height: 260px;
+            border-radius: 10px;
+            display: block;
+            margin: 0 auto 12px;
+            object-fit: contain;
+            background: #f8f9fa;
+        }
+
+        .cv-preview-actions {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .cv-preview-actions .btn {
+            min-width: 130px;
+        }
+
+        .cv-upload-panel.is-busy .cv-dropzone {
+            pointer-events: none;
+            opacity: 0.6;
+        }
     </style>
 </head>
 <body>
@@ -298,12 +414,7 @@
                     <h6>Computer Vision Agents</h6>
                     <ul class="list-unstyled agent-list">
                         <li data-agent="BRAIN_TUMOR_AGENT"><i class="fas fa-brain me-2"></i> Brain Tumor Detection</li>
-                        <li data-agent="CHEST_XRAY_AGENT"><i class="fas fa-lungs me-2"></i> Chest X-ray Covid-19
-                            Classification
-                        </li>
-                        <li data-agent="SKIN_LESION_AGENT"><i class="fas fa-allergies me-2"></i> Skin Lesion
-                            Segmentation
-                        </li>
+                        <li data-agent="BRAIN_STROKE_AGENT"><i class="fas fa-brain me-2"></i> Brain Stroke Detection</li>
                     </ul>
                 </div>
                 <div class="agent-info">
@@ -403,6 +514,33 @@
                             <i class="fas fa-paper-plane"></i>
                         </button>
                     </form>
+
+                    <!-- Image-only upload panel for Brain Tumor / Brain Stroke CV agents -->
+                    <div id="cv-upload-panel" class="cv-upload-panel d-none">
+                        <div class="cv-dropzone" id="cv-dropzone" tabindex="0" role="button"
+                             aria-label="Upload medical image">
+                            <input type="file" id="cv-file-input" accept="image/*" hidden>
+                            <div class="cv-upload-icon"><i class="fas fa-cloud-upload-alt"></i></div>
+                            <div class="cv-upload-title" id="cv-upload-title">Click or drop an image here</div>
+                            <div class="cv-upload-hint" id="cv-upload-hint">Supports JPG / PNG · single medical scan</div>
+                            <div class="cv-upload-stages">
+                                <span class="stage-chip" id="cv-stage-1"><i class="fas fa-object-group"></i>Segmentation</span>
+                                <span class="stage-chip" id="cv-stage-2"><i class="fas fa-highlighter"></i>Lesion marking</span>
+                                <span class="stage-chip" id="cv-stage-3"><i class="fas fa-stethoscope"></i>AI diagnosis</span>
+                            </div>
+                        </div>
+                        <div class="cv-preview d-none" id="cv-preview">
+                            <img id="cv-preview-img" src="" alt="preview">
+                            <div class="cv-preview-actions">
+                                <button type="button" class="btn btn-outline-secondary" id="cv-preview-remove">
+                                    <i class="fas fa-rotate-left me-1"></i><span id="cv-btn-reselect">Re-select</span>
+                                </button>
+                                <button type="button" class="btn btn-primary" id="cv-preview-submit">
+                                    <i class="fas fa-brain me-1"></i><span id="cv-btn-analyze">Start analysis</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -1109,8 +1247,7 @@
             'webSearchAgent': 'Web Search Agent',
             'cvAgents': 'Computer Vision Agents',
             'brainTumor': 'Brain Tumor Detection',
-            'chestXray': 'Chest X-ray Covid-19 Classification',
-            'skinLesion': 'Skin Lesion Segmentation',
+            'brainStroke': 'Brain Stroke Detection',
             'clearConv': 'Clear Conversation',
             'headerTitle': 'Multi-Agent Medical Assistant',
             'headerSubtitle': 'Upload medical images or ask health-related questions',
@@ -1128,7 +1265,16 @@
             'failTranscribe': 'Failed to transcribe speech. Please try again or type your message.',
             'procVal': '⏳ Processing validation...',
             'humanVal': 'HUMAN_VALIDATED',
-            'agentChanged': 'Agent selected: '
+            'agentChanged': 'Agent selected: ',
+            'cvUploadTitle': 'Click or drop a medical image here',
+            'cvUploadHint': 'Supports JPG / PNG · single medical scan',
+            'cvStageSegment': 'Segmentation',
+            'cvStageMark': 'Lesion marking',
+            'cvStageDiagnose': 'AI diagnosis',
+            'cvReselect': 'Re-select',
+            'cvAnalyze': 'Start analysis',
+            'cvAnalyzing': 'Analyzing...',
+            'cvOnlyImage': 'This agent only accepts medical image uploads.'
         },
         'zh': {
             'sidebarTitle': '医疗助手',
@@ -1154,8 +1300,7 @@
             'webSearchAgent': '网络搜索智能体',
             'cvAgents': '计算机视觉智能体',
             'brainTumor': '脑肿瘤检测',
-            'chestXray': '胸部X光新冠肺炎分类',
-            'skinLesion': '皮肤病变分割',
+            'brainStroke': '脑卒中检测',
             'clearConv': '清空对话',
             'headerTitle': '多智能体医疗助手',
             'headerSubtitle': '上传医学图像或询问健康相关问题',
@@ -1173,7 +1318,16 @@
             'failTranscribe': '语音转写失败。请重试或输入您的消息。',
             'procVal': '⏳ 正在处理验证...',
             'humanVal': '已人工验证',
-            'agentChanged': '已切换智能体：'
+            'agentChanged': '已切换智能体：',
+            'cvUploadTitle': '点击或拖拽医学影像到此处',
+            'cvUploadHint': '支持 JPG / PNG · 单张医学影像',
+            'cvStageSegment': '图像分割',
+            'cvStageMark': '病灶标记',
+            'cvStageDiagnose': 'AI 辅助诊断',
+            'cvReselect': '重新选择',
+            'cvAnalyze': '开始分析',
+            'cvAnalyzing': '分析中...',
+            'cvOnlyImage': '该智能体仅支持上传医学图像。'
         }
     };
 
@@ -1196,14 +1350,13 @@
             }
 
             const listItems = sidebar.querySelectorAll('li[data-agent]');
-            if (listItems.length >= 7) {
+            if (listItems.length >= 6) {
                 listItems[0].innerHTML = `<i class="fas fa-robot me-2"></i> ${t.autoRoute}`;
                 listItems[1].innerHTML = `<i class="fas fa-comment-medical me-2"></i> ${t.medConvAgent}`;
                 listItems[2].innerHTML = `<i class="fas fa-database me-2"></i> ${t.medRagAgent}`;
                 listItems[3].innerHTML = `<i class="fas fa-search me-2"></i> ${t.webSearchAgent}`;
                 listItems[4].innerHTML = `<i class="fas fa-brain me-2"></i> ${t.brainTumor}`;
-                listItems[5].innerHTML = `<i class="fas fa-lungs me-2"></i> ${t.chestXray}`;
-                listItems[6].innerHTML = `<i class="fas fa-allergies me-2"></i> ${t.skinLesion}`;
+                listItems[5].innerHTML = `<i class="fas fa-brain me-2"></i> ${t.brainStroke}`;
             }
 
             // Capabilities Update
@@ -1270,6 +1423,22 @@
 
         // Update button text
         document.getElementById('lang-toggle-btn').innerText = currentLanguage === 'en' ? '中 / EN' : 'EN / 中';
+
+        // CV upload panel i18n
+        const cvTitle = document.getElementById('cv-upload-title');
+        if (cvTitle) cvTitle.innerText = t.cvUploadTitle;
+        const cvHint = document.getElementById('cv-upload-hint');
+        if (cvHint) cvHint.innerText = t.cvUploadHint;
+        const stage1 = document.getElementById('cv-stage-1');
+        if (stage1) stage1.innerHTML = `<i class="fas fa-object-group"></i>${t.cvStageSegment}`;
+        const stage2 = document.getElementById('cv-stage-2');
+        if (stage2) stage2.innerHTML = `<i class="fas fa-highlighter"></i>${t.cvStageMark}`;
+        const stage3 = document.getElementById('cv-stage-3');
+        if (stage3) stage3.innerHTML = `<i class="fas fa-stethoscope"></i>${t.cvStageDiagnose}`;
+        const cvReselect = document.getElementById('cv-btn-reselect');
+        if (cvReselect) cvReselect.innerText = t.cvReselect;
+        const cvAnalyze = document.getElementById('cv-btn-analyze');
+        if (cvAnalyze) cvAnalyze.innerText = t.cvAnalyze;
     }
 
     let currentSelectedAgent = 'AUTO';
@@ -1303,12 +1472,148 @@
                 // Update selected agent variable
                 currentSelectedAgent = this.getAttribute('data-agent');
 
+                // Toggle chat form vs. image-only upload panel based on agent
+                applyAgentUIMode(currentSelectedAgent);
+
                 // Show toast notification
                 const agentName = this.innerText.trim();
                 showToast(translations[currentLanguage].agentChanged + agentName, 'success');
                 console.log("Selected Agent:", currentSelectedAgent);
             });
         });
+
+        // ======================================================
+        // Image-only upload panel for Brain CV agents
+        // ======================================================
+        const cvOnlyAgents = ['BRAIN_TUMOR_AGENT', 'BRAIN_STROKE_AGENT'];
+        const cvUploadPanel = document.getElementById('cv-upload-panel');
+        const cvDropzone = document.getElementById('cv-dropzone');
+        const cvFileInput = document.getElementById('cv-file-input');
+        const cvPreview = document.getElementById('cv-preview');
+        const cvPreviewImg = document.getElementById('cv-preview-img');
+        const cvPreviewRemove = document.getElementById('cv-preview-remove');
+        const cvPreviewSubmit = document.getElementById('cv-preview-submit');
+
+        function isCVOnlyAgent(agent) {
+            return cvOnlyAgents.indexOf(agent) !== -1;
+        }
+
+        function applyAgentUIMode(agent) {
+            if (isCVOnlyAgent(agent)) {
+                chatForm.classList.add('d-none');
+                cvUploadPanel.classList.remove('d-none');
+                resetCVUploadPanel();
+            } else {
+                cvUploadPanel.classList.add('d-none');
+                chatForm.classList.remove('d-none');
+            }
+        }
+
+        function resetCVUploadPanel() {
+            cvFileInput.value = '';
+            cvPreview.classList.add('d-none');
+            cvDropzone.classList.remove('d-none');
+            cvPreviewImg.src = '';
+            cvUploadPanel.classList.remove('is-busy');
+            cvPreviewSubmit.disabled = false;
+            cvPreviewSubmit.innerHTML = `<i class="fas fa-brain me-1"></i><span id="cv-btn-analyze">${translations[currentLanguage].cvAnalyze}</span>`;
+        }
+
+        function showCVPreview(file) {
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                cvPreviewImg.src = e.target.result;
+                cvPreview.classList.remove('d-none');
+                cvDropzone.classList.add('d-none');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function handleCVFile(file) {
+            if (!file) return;
+            if (!file.type || file.type.indexOf('image/') !== 0) {
+                showToast(translations[currentLanguage].cvOnlyImage, 'danger');
+                return;
+            }
+            showCVPreview(file);
+        }
+
+        // Click dropzone -> open file picker
+        cvDropzone.addEventListener('click', function () {
+            cvFileInput.click();
+        });
+        cvDropzone.addEventListener('keydown', function (e) {
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                cvFileInput.click();
+            }
+        });
+
+        // Drag & drop support
+        ['dragenter', 'dragover'].forEach(evt => {
+            cvDropzone.addEventListener(evt, function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                cvDropzone.classList.add('is-dragover');
+            });
+        });
+        ['dragleave', 'drop'].forEach(evt => {
+            cvDropzone.addEventListener(evt, function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                cvDropzone.classList.remove('is-dragover');
+            });
+        });
+        cvDropzone.addEventListener('drop', function (e) {
+            const files = e.dataTransfer && e.dataTransfer.files;
+            if (files && files.length) {
+                handleCVFile(files[0]);
+            }
+        });
+
+        // File picker change
+        cvFileInput.addEventListener('change', function (e) {
+            if (e.target.files && e.target.files.length) {
+                handleCVFile(e.target.files[0]);
+            }
+        });
+
+        // Re-select -> clear and go back to dropzone
+        cvPreviewRemove.addEventListener('click', function () {
+            resetCVUploadPanel();
+        });
+
+        // Submit -> inject file into the hidden chat form and reuse existing pipeline
+        cvPreviewSubmit.addEventListener('click', function () {
+            const file = cvFileInput.files && cvFileInput.files[0];
+            if (!file) return;
+
+            cvUploadPanel.classList.add('is-busy');
+            cvPreviewSubmit.disabled = true;
+            cvPreviewSubmit.innerHTML = `<i class="fas fa-spinner fa-spin me-1"></i>${translations[currentLanguage].cvAnalyzing}`;
+
+            // Inject into the hidden chat form inputs to reuse its submit handler
+            try {
+                const dt = new DataTransfer();
+                dt.items.add(file);
+                imageUpload.files = dt.files;
+            } catch (err) {
+                console.error('DataTransfer not supported:', err);
+            }
+            // Synchronously sync the preview data URL so the existing submit handler
+            // embeds the image into the user's chat bubble correctly.
+            previewImage.src = cvPreviewImg.src;
+            // Empty message text since this agent only accepts images
+            messageInput.value = '';
+            // Submit the chat form (existing handler will POST to /upload)
+            chatForm.dispatchEvent(new Event('submit'));
+
+            // Reset the CV panel after a short delay to allow the pipeline to pick up the file
+            setTimeout(resetCVUploadPanel, 400);
+        });
+
+        // Initialize UI mode once on load
+        applyAgentUIMode(currentSelectedAgent);
 
         // Add voice recording button to the UI
         const fileUploadContainer = document.querySelector('.file-upload-container');
@@ -1416,7 +1721,7 @@
             userMessageElement.className = 'message user-message';
 
             // Create message content with image if available
-            let messageContent = `<p>${message}</p>`;
+            let messageContent = message ? `<p>${message}</p>` : '';
             if (imageDataUrl) {
                 messageContent += `
                         <div class="mt-2">
@@ -1528,9 +1833,13 @@
 
                 // Add result image if it exists
                 if (data.result_image) {
-                    // If the skin lesion segmentation agent was used and both the user uploaded
-                    // an image and we have a result image, display them side by side
-                    if (data.agent === "SKIN_LESION_AGENT, HUMAN_VALIDATION" && imageDataUrl) {
+                    // If a CV agent produced a result image and the user uploaded one,
+                    // display them side by side (brain tumor / brain stroke)
+                    const sideBySideAgents = [
+                        "BRAIN_TUMOR_AGENT, HUMAN_VALIDATION",
+                        "BRAIN_STROKE_AGENT, HUMAN_VALIDATION"
+                    ];
+                    if (sideBySideAgents.indexOf(data.agent) !== -1 && imageDataUrl) {
                         assistantHtml += `
                                 <div class="image-side-by-side">
                                     <div class="image-container">
