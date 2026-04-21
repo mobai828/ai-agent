@@ -39,7 +39,7 @@ The **Multi-Agent Medical Assistant** is an **AI-powered chatbot** designed to a
   - **Medical Conversation Agent**: General health queries and greetings.
   - **Medical RAG Agent**: Deep-dives into uploaded medical literature.
   - **Web Search Agent**: Fetches the latest medical news and research.
-  - **Computer Vision Agents**: Analyzes Chest X-rays and Skin Lesions.
+  - **Computer Vision Agents**: Supports brain MRI analysis workflows.
 
 - 🔍 **Advanced Agentic RAG Retrieval System**:
   - Lightweight PDF parsing using `PyPDFLoader`.
@@ -48,9 +48,8 @@ The **Multi-Agent Medical Assistant** is an **AI-powered chatbot** designed to a
   - Input-output guardrails for safe responses.
 
 - 🏥 **Medical Imaging Analysis**:
-  - Chest X-ray Disease Classification.
-  - Skin Lesion Segmentation.
-  - *Note: Brain Tumor Detection is a placeholder for future implementation.*
+  - Brain MRI analysis workflow.
+  - *Note: Brain Tumor Detection remains a placeholder for future implementation.*
 
 - 🌐 **Real-time Research Integration**: Web search agent retrieves the latest medical research papers and findings using Tavily.
 

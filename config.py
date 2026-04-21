@@ -118,9 +118,6 @@ class RAGConfig:
 class MedicalCVConfig:
     def __init__(self):
         self.brain_tumor_model_path = "./agents/image_analysis_agent/brain_tumor_agent/models/brain_tumor_segmentation.pth"
-        self.chest_xray_model_path = "./agents/image_analysis_agent/chest_xray_agent/models/covid_chest_xray_model.pth"
-        self.skin_lesion_model_path = "./agents/image_analysis_agent/skin_lesion_agent/models/checkpointN25_.pth.tar"
-        self.skin_lesion_segmentation_output_path = "./uploads/skin_lesion_output/segmentation_plot.png"
         self.llm = ChatOpenAI(
             model="glm-4v-flash",
             api_key=ZHIPU_API_KEY,
@@ -141,9 +138,7 @@ class ValidationConfig:
             "CONVERSATION_AGENT": False,
             "RAG_AGENT": False,
             "WEB_SEARCH_AGENT": False,
-            "BRAIN_TUMOR_AGENT": True,
-            "CHEST_XRAY_AGENT": True,
-            "SKIN_LESION_AGENT": True
+            "BRAIN_TUMOR_AGENT": True
         }
         self.validation_timeout = 300
         self.default_action = "reject"

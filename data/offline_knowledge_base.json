@@ -43,12 +43,6 @@
       "en_answer": "For weight management, prioritize sustainability: at least 150 minutes of moderate exercise weekly, calorie control, and high-fiber/protein food choices. A practical target is 0.25-0.5 kg loss per week."
     },
     {
-      "id": "skin_lesion",
-      "keywords": ["皮肤", "痣", "黑色素瘤", "皮损", "skin lesion", "mole", "melanoma"],
-      "zh_answer": "皮肤病变可先用ABCDE原则自查（不对称、边界不清、颜色不均、直径增大、短期演变）。若近期快速变化、出血或破溃，建议尽快皮肤科面诊。",
-      "en_answer": "Use the ABCDE rule for skin lesions (Asymmetry, Border, Color, Diameter, Evolution). Rapid recent changes, bleeding, or ulceration should be evaluated in-person by dermatology promptly."
-    },
-    {
       "id": "chest_symptom_warning",
       "keywords": ["胸痛", "胸闷", "呼吸困难", "heart attack", "chest pain", "shortness of breath"],
       "zh_answer": "胸痛/呼吸困难属于高风险症状。请立即停止活动并尽快前往急诊或呼叫120，不建议仅在线观察。",

@@ -37,11 +37,10 @@ app = FastAPI(title="Multi-Agent Medical Chatbot", version="2.0")
 # Set up directories
 UPLOAD_FOLDER = "uploads/backend"
 FRONTEND_UPLOAD_FOLDER = "uploads/frontend"
-SKIN_LESION_OUTPUT = "uploads/skin_lesion_output"
 SPEECH_DIR = "uploads/speech"
 
 # Create directories if they don't exist
-for directory in [UPLOAD_FOLDER, FRONTEND_UPLOAD_FOLDER, SKIN_LESION_OUTPUT, SPEECH_DIR]:
+for directory in [UPLOAD_FOLDER, FRONTEND_UPLOAD_FOLDER, SPEECH_DIR]:
     os.makedirs(directory, exist_ok=True)
 
 # Mount static files directory
@@ -178,14 +177,6 @@ def chat(
             "agent": response_data.get("agent_name", "UNKNOWN_AGENT")
         }
 
-        # If it's the skin lesion segmentation agent, check for output image
-        if response_data.get("agent_name") == "SKIN_LESION_AGENT, HUMAN_VALIDATION":
-            segmentation_path = os.path.join(SKIN_LESION_OUTPUT, "segmentation_plot.png")
-            if os.path.exists(segmentation_path):
-                result["result_image"] = f"/uploads/skin_lesion_output/segmentation_plot.png"
-            else:
-                print("Skin Lesion Output path does not exist.")
-
         return result
     except Exception as e:
         logger.exception("Online chat pipeline failed")
@@ -269,14 +260,6 @@ async def upload_image(
             "response": response_text,
             "agent": response_data.get("agent_name", "UNKNOWN_AGENT")
         }
-
-        # If it's the skin lesion segmentation agent, check for output image
-        if response_data.get("agent_name") == "SKIN_LESION_AGENT, HUMAN_VALIDATION":
-            segmentation_path = os.path.join(SKIN_LESION_OUTPUT, "segmentation_plot.png")
-            if os.path.exists(segmentation_path):
-                result["result_image"] = f"/uploads/skin_lesion_output/segmentation_plot.png"
-            else:
-                print("Skin Lesion Output path does not exist.")
 
         return result
     except Exception as e:
