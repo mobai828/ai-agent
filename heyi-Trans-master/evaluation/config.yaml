@@ -1,0 +1,23 @@
+# 评估配置文件
+evaluation:
+  # 模型配置
+  model:
+    config_path: "configs/base.yaml"
+    weights_path: "models/best_model.pth"
+  
+  # 数据配置
+  data:
+    data_dir: "./data"
+    batch_size: 32
+    num_workers: 4
+  
+  # 评估配置
+  settings:
+    device: "cuda"  # cuda 或 cpu
+    tasks: ["classification", "detection", "segmentation", "retrieval"]
+  
+  # 输出配置
+  output:
+    reports_dir: "./evaluation/reports"
+    generate_plots: true
+    save_detailed_results: true

@@ -11,14 +11,16 @@ class ImageAnalysisAgent:
     def __init__(self, config):
         self.image_classifier = ImageClassifier(vision_model=config.medical_cv.llm)
 
-        # Reserved-interface CV agents (actual algorithms implemented by another team)
+        # 脑部影像 CV 智能体（由 heyi-Trans-master 通用视觉模型提供算法能力）
         self.brain_tumor_agent = BrainTumorAgent(
             model_path=getattr(config.medical_cv, "brain_tumor_model_path", None),
             output_dir=getattr(config.medical_cv, "brain_tumor_output_dir", None),
+            config=config.medical_cv,
         )
         self.brain_stroke_agent = BrainStrokeAgent(
             model_path=getattr(config.medical_cv, "brain_stroke_model_path", None),
             output_dir=getattr(config.medical_cv, "brain_stroke_output_dir", None),
+            config=config.medical_cv,
         )
         self.brain_tumor_output_path = getattr(
             config.medical_cv,
@@ -41,5 +43,14 @@ class ImageAnalysisAgent:
         return self.brain_tumor_agent.predict(image_path, self.brain_tumor_output_path)
 
     # brain stroke agent (reserved interface)
-    def detect_brain_stroke(self, image_path: str) -> dict:
-        return self.brain_stroke_agent.predict(image_path, self.brain_stroke_output_path)
+    def detect_brain_stroke(self, image_path: str, task: str = None) -> dict:
+        """脑卒中检测入口。
+
+        Args:
+            image_path: 上传图像本地路径
+            task: ``"auto"`` / ``"hemorrhage"`` / ``"ischemia"``。
+                  推荐由上游分类模块 / 前端显式给定，提高准确率。
+        """
+        return self.brain_stroke_agent.predict(
+            image_path, self.brain_stroke_output_path, task=task
+        )

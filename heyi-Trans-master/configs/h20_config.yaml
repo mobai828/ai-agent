@@ -1,0 +1,12 @@
+# H20单卡优化配置
+_base_: "base.yaml"
+
+hardware:
+  device: "cuda:0"
+  memory_limit_gb: 22
+  
+training:
+  batch_size: 4
+  gradient_accumulation: 8
+  mixed_precision: "bf16"
+  gradient_checkpointing: true

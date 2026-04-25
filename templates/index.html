@@ -384,6 +384,182 @@
             pointer-events: none;
             opacity: 0.6;
         }
+
+        /* 折叠态：分析完成后只显示一条窄按钮，避免遮挡上方的分析结果 */
+        .cv-collapsed {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 8px 12px;
+        }
+
+        .cv-collapsed .btn {
+            border-radius: 999px;
+            padding: 6px 18px;
+            font-size: 0.92rem;
+            border-style: dashed;
+        }
+
+        .cv-collapsed .btn:hover {
+            border-style: solid;
+        }
+
+        /* ============================================================
+           CV upload panel header (title + manual collapse button)
+           ============================================================ */
+        .cv-panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 6px 4px 8px;
+        }
+
+        .cv-panel-title {
+            font-size: 0.92rem;
+            color: #495057;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+        }
+
+        .cv-panel-collapse-btn {
+            border: 1px solid #cfd6dd;
+            background: #fff;
+            color: #495057;
+            border-radius: 999px;
+            width: 28px;
+            height: 28px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.18s ease;
+        }
+
+        .cv-panel-collapse-btn:hover {
+            border-color: #0d6efd;
+            color: #0d6efd;
+        }
+
+        /* ============================================================
+           Stroke subtype picker (auto / ischemia / hemorrhage)
+           ============================================================ */
+        .cv-task-picker {
+            margin: 0 4px 12px;
+            padding: 12px 14px;
+            background: #ffffff;
+            border: 1px solid #e3e8ef;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+        }
+
+        .cv-task-picker-label {
+            font-size: 0.85rem;
+            color: #495057;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .cv-task-picker-options {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .cv-task-option {
+            position: relative;
+            cursor: pointer;
+            margin: 0;
+        }
+
+        .cv-task-option input[type="radio"] {
+            position: absolute;
+            opacity: 0;
+            inset: 0;
+            cursor: pointer;
+        }
+
+        .cv-task-option > span {
+            display: inline-flex;
+            align-items: center;
+            padding: 6px 14px;
+            border: 1px solid #cfd6dd;
+            border-radius: 999px;
+            background: #f8f9fa;
+            color: #495057;
+            font-size: 0.86rem;
+            transition: all 0.18s ease;
+        }
+
+        .cv-task-option:hover > span {
+            border-color: #0d6efd;
+            color: #0d6efd;
+            background: #f0f7ff;
+        }
+
+        .cv-task-option input[type="radio"]:checked + span {
+            background: #0d6efd;
+            border-color: #0d6efd;
+            color: #fff;
+            box-shadow: 0 2px 6px rgba(13, 110, 253, 0.25);
+        }
+
+        .cv-task-picker-hint {
+            margin-top: 8px;
+            font-size: 0.78rem;
+            color: #6c757d;
+        }
+
+        /* ============================================================
+           Collapsible "Add comments" textarea inside the human-validation
+           panel. Default folded so the screenshot result image is not
+           pushed below the fold; user clicks to expand.
+           ============================================================ */
+        .val-comment-toggle {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 2px 10px;
+            font-size: 0.82rem;
+            border-radius: 999px;
+            border: 1px solid #cfd6dd;
+            background: #fff;
+            color: #495057;
+            cursor: pointer;
+            transition: all 0.18s ease;
+        }
+
+        .val-comment-toggle:hover {
+            border-color: #0d6efd;
+            color: #0d6efd;
+        }
+
+        .val-comment-toggle .chevron {
+            transition: transform 0.2s ease;
+        }
+
+        .val-comment-toggle.is-expanded .chevron {
+            transform: rotate(180deg);
+        }
+
+        .val-comment-wrap {
+            display: grid;
+            grid-template-rows: 0fr;
+            transition: grid-template-rows 0.22s ease;
+            overflow: hidden;
+        }
+
+        .val-comment-wrap.is-expanded {
+            grid-template-rows: 1fr;
+        }
+
+        .val-comment-wrap > .val-comment-inner {
+            min-height: 0;
+        }
+
+        .val-comment-wrap textarea {
+            margin-top: 8px;
+        }
     </style>
 </head>
 <body>
@@ -517,28 +693,68 @@
 
                     <!-- Image-only upload panel for Brain Tumor / Brain Stroke CV agents -->
                     <div id="cv-upload-panel" class="cv-upload-panel d-none">
-                        <div class="cv-dropzone" id="cv-dropzone" tabindex="0" role="button"
-                             aria-label="Upload medical image">
-                            <input type="file" id="cv-file-input" accept="image/*" hidden>
-                            <div class="cv-upload-icon"><i class="fas fa-cloud-upload-alt"></i></div>
-                            <div class="cv-upload-title" id="cv-upload-title">Click or drop an image here</div>
-                            <div class="cv-upload-hint" id="cv-upload-hint">Supports JPG / PNG · single medical scan</div>
-                            <div class="cv-upload-stages">
-                                <span class="stage-chip" id="cv-stage-1"><i class="fas fa-object-group"></i>Segmentation</span>
-                                <span class="stage-chip" id="cv-stage-2"><i class="fas fa-highlighter"></i>Lesion marking</span>
-                                <span class="stage-chip" id="cv-stage-3"><i class="fas fa-stethoscope"></i>AI diagnosis</span>
+                        <!-- Header: title + manual collapse button (always visible while expanded) -->
+                        <div class="cv-panel-header" id="cv-panel-header">
+                            <div class="cv-panel-title">
+                                <i class="fas fa-image me-2"></i>
+                                <span id="cv-panel-title-text">Image upload</span>
+                            </div>
+                            <button type="button" class="cv-panel-collapse-btn" id="cv-panel-collapse-btn"
+                                    aria-label="Collapse upload panel" title="Collapse">
+                                <i class="fas fa-chevron-up"></i>
+                            </button>
+                        </div>
+                        <!-- Expanded state: full dropzone + preview (default for fresh CV mode) -->
+                        <div id="cv-expanded">
+                            <!-- Stroke subtype selector (visible only for BRAIN_STROKE_AGENT) -->
+                            <div class="cv-task-picker d-none" id="cv-task-picker">
+                                <div class="cv-task-picker-label" id="cv-task-picker-label">Stroke subtype</div>
+                                <div class="cv-task-picker-options" role="radiogroup" aria-label="Stroke subtype">
+                                    <label class="cv-task-option" data-task="auto">
+                                        <input type="radio" name="cv-stroke-task" value="auto" checked>
+                                        <span><i class="fas fa-magic me-1"></i><span data-i18n="cvTaskAuto">Auto</span></span>
+                                    </label>
+                                    <label class="cv-task-option" data-task="ischemia">
+                                        <input type="radio" name="cv-stroke-task" value="ischemia">
+                                        <span><i class="fas fa-tint-slash me-1"></i><span data-i18n="cvTaskIschemia">Ischemia</span></span>
+                                    </label>
+                                    <label class="cv-task-option" data-task="hemorrhage">
+                                        <input type="radio" name="cv-stroke-task" value="hemorrhage">
+                                        <span><i class="fas fa-droplet me-1"></i><span data-i18n="cvTaskHemorrhage">Hemorrhage</span></span>
+                                    </label>
+                                </div>
+                                <div class="cv-task-picker-hint" id="cv-task-picker-hint">Pick the subtype determined by the upstream classifier for higher accuracy.</div>
+                            </div>
+                            <div class="cv-dropzone" id="cv-dropzone" tabindex="0" role="button"
+                                 aria-label="Upload medical image">
+                                <input type="file" id="cv-file-input" accept="image/*" hidden>
+                                <div class="cv-upload-icon"><i class="fas fa-cloud-upload-alt"></i></div>
+                                <div class="cv-upload-title" id="cv-upload-title">Click or drop an image here</div>
+                                <div class="cv-upload-hint" id="cv-upload-hint">Supports JPG / PNG · single medical scan</div>
+                                <div class="cv-upload-stages">
+                                    <span class="stage-chip" id="cv-stage-1"><i class="fas fa-object-group"></i>Segmentation</span>
+                                    <span class="stage-chip" id="cv-stage-2"><i class="fas fa-highlighter"></i>Lesion marking</span>
+                                    <span class="stage-chip" id="cv-stage-3"><i class="fas fa-stethoscope"></i>AI diagnosis</span>
+                                </div>
+                            </div>
+                            <div class="cv-preview d-none" id="cv-preview">
+                                <img id="cv-preview-img" src="" alt="preview">
+                                <div class="cv-preview-actions">
+                                    <button type="button" class="btn btn-outline-secondary" id="cv-preview-remove">
+                                        <i class="fas fa-rotate-left me-1"></i><span id="cv-btn-reselect">Re-select</span>
+                                    </button>
+                                    <button type="button" class="btn btn-primary" id="cv-preview-submit">
+                                        <i class="fas fa-brain me-1"></i><span id="cv-btn-analyze">Start analysis</span>
+                                    </button>
+                                </div>
                             </div>
                         </div>
-                        <div class="cv-preview d-none" id="cv-preview">
-                            <img id="cv-preview-img" src="" alt="preview">
-                            <div class="cv-preview-actions">
-                                <button type="button" class="btn btn-outline-secondary" id="cv-preview-remove">
-                                    <i class="fas fa-rotate-left me-1"></i><span id="cv-btn-reselect">Re-select</span>
-                                </button>
-                                <button type="button" class="btn btn-primary" id="cv-preview-submit">
-                                    <i class="fas fa-brain me-1"></i><span id="cv-btn-analyze">Start analysis</span>
-                                </button>
-                            </div>
+                        <!-- Collapsed state: only a slim button shown after analysis,
+                             so the result image isn't blocked by the dropzone -->
+                        <div id="cv-collapsed" class="cv-collapsed d-none">
+                            <button type="button" class="btn btn-outline-primary" id="cv-expand-btn">
+                                <i class="fas fa-cloud-upload-alt me-1"></i><span id="cv-collapsed-label">Upload another image</span>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -1274,7 +1490,17 @@
             'cvReselect': 'Re-select',
             'cvAnalyze': 'Start analysis',
             'cvAnalyzing': 'Analyzing...',
-            'cvOnlyImage': 'This agent only accepts medical image uploads.'
+            'cvOnlyImage': 'This agent only accepts medical image uploads.',
+            'cvUploadAnother': 'Upload another image',
+            'valToggleExpand': 'Add comments',
+            'valToggleCollapse': 'Hide comments',
+            'cvPanelTitle': 'Image upload',
+            'cvPanelCollapse': 'Collapse upload panel',
+            'cvTaskPickerLabel': 'Stroke subtype',
+            'cvTaskAuto': 'Auto',
+            'cvTaskIschemia': 'Ischemia',
+            'cvTaskHemorrhage': 'Hemorrhage',
+            'cvTaskHint': 'Pick the subtype determined by the upstream classifier for higher accuracy.'
         },
         'zh': {
             'sidebarTitle': '医疗助手',
@@ -1327,7 +1553,17 @@
             'cvReselect': '重新选择',
             'cvAnalyze': '开始分析',
             'cvAnalyzing': '分析中...',
-            'cvOnlyImage': '该智能体仅支持上传医学图像。'
+            'cvOnlyImage': '该智能体仅支持上传医学图像。',
+            'cvUploadAnother': '上传新影像',
+            'valToggleExpand': '添加评论',
+            'valToggleCollapse': '收起评论',
+            'cvPanelTitle': '影像上传',
+            'cvPanelCollapse': '收起上传面板',
+            'cvTaskPickerLabel': '卒中亚型',
+            'cvTaskAuto': '自动判定',
+            'cvTaskIschemia': '缺血',
+            'cvTaskHemorrhage': '出血',
+            'cvTaskHint': '由其他模块（缺血/出血分类器）的结果决定，明确指定可大幅提升分割准确率。'
         }
     };
 
@@ -1439,6 +1675,25 @@
         if (cvReselect) cvReselect.innerText = t.cvReselect;
         const cvAnalyze = document.getElementById('cv-btn-analyze');
         if (cvAnalyze) cvAnalyze.innerText = t.cvAnalyze;
+        const cvCollapsedLabel = document.getElementById('cv-collapsed-label');
+        if (cvCollapsedLabel) cvCollapsedLabel.innerText = t.cvUploadAnother;
+
+        // CV panel header + stroke task picker i18n
+        const cvPanelTitle = document.getElementById('cv-panel-title-text');
+        if (cvPanelTitle) cvPanelTitle.innerText = t.cvPanelTitle;
+        const cvCollapseBtn = document.getElementById('cv-panel-collapse-btn');
+        if (cvCollapseBtn) {
+            cvCollapseBtn.setAttribute('aria-label', t.cvPanelCollapse);
+            cvCollapseBtn.setAttribute('title', t.cvPanelCollapse);
+        }
+        const cvTaskLabel = document.getElementById('cv-task-picker-label');
+        if (cvTaskLabel) cvTaskLabel.innerText = t.cvTaskPickerLabel;
+        const cvTaskHint = document.getElementById('cv-task-picker-hint');
+        if (cvTaskHint) cvTaskHint.innerText = t.cvTaskHint;
+        document.querySelectorAll('#cv-task-picker [data-i18n]').forEach(el => {
+            const key = el.getAttribute('data-i18n');
+            if (key && t[key]) el.innerText = t[key];
+        });
     }
 
     let currentSelectedAgent = 'AUTO';
@@ -1487,15 +1742,27 @@
         // ======================================================
         const cvOnlyAgents = ['BRAIN_TUMOR_AGENT', 'BRAIN_STROKE_AGENT'];
         const cvUploadPanel = document.getElementById('cv-upload-panel');
+        const cvExpanded = document.getElementById('cv-expanded');
+        const cvCollapsed = document.getElementById('cv-collapsed');
+        const cvExpandBtn = document.getElementById('cv-expand-btn');
+        const cvCollapseBtn = document.getElementById('cv-panel-collapse-btn');
         const cvDropzone = document.getElementById('cv-dropzone');
         const cvFileInput = document.getElementById('cv-file-input');
         const cvPreview = document.getElementById('cv-preview');
         const cvPreviewImg = document.getElementById('cv-preview-img');
         const cvPreviewRemove = document.getElementById('cv-preview-remove');
         const cvPreviewSubmit = document.getElementById('cv-preview-submit');
+        const cvTaskPicker = document.getElementById('cv-task-picker');
 
         function isCVOnlyAgent(agent) {
             return cvOnlyAgents.indexOf(agent) !== -1;
+        }
+
+        // 当前选中的卒中亚型（auto/hemorrhage/ischemia），由前端的 radio 决定，
+        // 提交时通过 stroke_task 字段传给后端，后端再下发到远程分割服务。
+        function getSelectedStrokeTask() {
+            const checked = document.querySelector('input[name="cv-stroke-task"]:checked');
+            return checked ? checked.value : 'auto';
         }
 
         function applyAgentUIMode(agent) {
@@ -1503,6 +1770,15 @@
                 chatForm.classList.add('d-none');
                 cvUploadPanel.classList.remove('d-none');
                 resetCVUploadPanel();
+                expandCVPanel();
+                // 仅 BRAIN_STROKE_AGENT 需要选缺血/出血亚型；脑肿瘤直接隐藏。
+                if (cvTaskPicker) {
+                    if (agent === 'BRAIN_STROKE_AGENT') {
+                        cvTaskPicker.classList.remove('d-none');
+                    } else {
+                        cvTaskPicker.classList.add('d-none');
+                    }
+                }
             } else {
                 cvUploadPanel.classList.add('d-none');
                 chatForm.classList.remove('d-none');
@@ -1517,6 +1793,30 @@
             cvUploadPanel.classList.remove('is-busy');
             cvPreviewSubmit.disabled = false;
             cvPreviewSubmit.innerHTML = `<i class="fas fa-brain me-1"></i><span id="cv-btn-analyze">${translations[currentLanguage].cvAnalyze}</span>`;
+        }
+
+        // 折叠成"上传新影像"按钮，避免遮挡上方的分割结果
+        function collapseCVPanel() {
+            resetCVUploadPanel();
+            if (cvExpanded) cvExpanded.classList.add('d-none');
+            if (cvCollapsed) cvCollapsed.classList.remove('d-none');
+        }
+
+        // 展开完整 dropzone，进入新一轮上传
+        function expandCVPanel() {
+            if (cvCollapsed) cvCollapsed.classList.add('d-none');
+            if (cvExpanded) cvExpanded.classList.remove('d-none');
+            resetCVUploadPanel();
+        }
+
+        if (cvExpandBtn) {
+            cvExpandBtn.addEventListener('click', expandCVPanel);
+        }
+
+        // 手动收起：点击 header 上的 ⌃ 按钮，把整块上传面板压成一行小按钮，
+        // 不必等到分析完成才能腾出屏幕空间。
+        if (cvCollapseBtn) {
+            cvCollapseBtn.addEventListener('click', collapseCVPanel);
         }
 
         function showCVPreview(file) {
@@ -1583,34 +1883,138 @@
             resetCVUploadPanel();
         });
 
-        // Submit -> inject file into the hidden chat form and reuse existing pipeline
+        // 把 DataURL (data:image/xxx;base64,...) 转成可上传的 File 对象。
+        // 用于兜底：当浏览器（隐私保护 / 扩展）把 input.files 清空但预览图还在时，
+        // 直接从预览图 DataURL 重建 File，保证 "所见即可传"。
+        function dataURLToFile(dataURL, filename) {
+            const commaIdx = dataURL.indexOf(',');
+            if (commaIdx < 0) throw new Error('invalid dataURL');
+            const meta = dataURL.substring(0, commaIdx);
+            const base64 = dataURL.substring(commaIdx + 1);
+            const mimeMatch = meta.match(/:(.*?);/);
+            const mime = mimeMatch ? mimeMatch[1] : 'image/png';
+            const binStr = atob(base64);
+            const arr = new Uint8Array(binStr.length);
+            for (let i = 0; i < binStr.length; i++) arr[i] = binStr.charCodeAt(i);
+            const ext = (mime.split('/')[1] || 'png').replace('jpeg', 'jpg');
+            return new File([arr], filename || `upload.${ext}`, { type: mime });
+        }
+
+        // Submit -> 优先复用隐藏 chatForm 的 submit handler；若注入失败（某些浏览器
+        // 不允许通过 DataTransfer 写回 input.files），则直接走 fetch 作为保底，
+        // 保证 "开始分析" 按钮永远能触发请求。
         cvPreviewSubmit.addEventListener('click', function () {
-            const file = cvFileInput.files && cvFileInput.files[0];
-            if (!file) return;
+            let file = cvFileInput.files && cvFileInput.files[0];
+
+            // 兜底：若 input.files 被浏览器/扩展清空，但预览图上还有 DataURL，
+            // 则从 DataURL 重建 File 对象（适用于 Edge 隐私保护 / Firefox strict 等环境）。
+            if (!file && cvPreviewImg.src && cvPreviewImg.src.indexOf('data:') === 0) {
+                try {
+                    file = dataURLToFile(cvPreviewImg.src, 'medical_image.png');
+                    console.info('[CV Upload] 从预览 DataURL 重建了 File（input.files 已被清空）');
+                } catch (err) {
+                    console.warn('[CV Upload] 从 DataURL 重建 File 失败：', err);
+                }
+            }
+
+            if (!file) {
+                console.warn('[CV Upload] 没有选中文件，按钮被点击但无文件可提交');
+                if (typeof showToast === 'function') {
+                    showToast('请先选择要分析的医学图像', 'danger');
+                }
+                return;
+            }
 
             cvUploadPanel.classList.add('is-busy');
             cvPreviewSubmit.disabled = true;
             cvPreviewSubmit.innerHTML = `<i class="fas fa-spinner fa-spin me-1"></i>${translations[currentLanguage].cvAnalyzing}`;
 
-            // Inject into the hidden chat form inputs to reuse its submit handler
+            let injectionOk = false;
             try {
                 const dt = new DataTransfer();
                 dt.items.add(file);
                 imageUpload.files = dt.files;
+                injectionOk = imageUpload.files && imageUpload.files.length === 1;
             } catch (err) {
-                console.error('DataTransfer not supported:', err);
+                console.warn('[CV Upload] DataTransfer 不可用，走直连 fetch 保底：', err);
             }
-            // Synchronously sync the preview data URL so the existing submit handler
-            // embeds the image into the user's chat bubble correctly.
-            previewImage.src = cvPreviewImg.src;
-            // Empty message text since this agent only accepts images
-            messageInput.value = '';
-            // Submit the chat form (existing handler will POST to /upload)
-            chatForm.dispatchEvent(new Event('submit'));
 
-            // Reset the CV panel after a short delay to allow the pipeline to pick up the file
-            setTimeout(resetCVUploadPanel, 400);
+            previewImage.src = cvPreviewImg.src;
+            messageInput.value = '';
+
+            if (injectionOk) {
+                // 优先路径：复用 chatForm 的 submit 回调 (包含消息渲染 / 响应处理等)
+                // 用 requestSubmit() 比 dispatchEvent(new Event('submit')) 更可靠
+                try {
+                    if (typeof chatForm.requestSubmit === 'function') {
+                        chatForm.requestSubmit();
+                    } else {
+                        chatForm.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+                    }
+                    setTimeout(collapseCVPanel, 400);
+                    return;
+                } catch (err) {
+                    console.warn('[CV Upload] chatForm 提交失败，走直连 fetch 保底：', err);
+                }
+            }
+
+            // 保底路径：直接 POST /upload，并最少渲染一条消息到聊天气泡
+            cvFallbackSubmit(file);
         });
+
+        async function cvFallbackSubmit(file) {
+            try {
+                // 用户气泡：展示上传图
+                const userMsg = document.createElement('div');
+                userMsg.className = 'message user-message';
+                userMsg.innerHTML = `
+                    <div class="mt-2">
+                        <img src="${cvPreviewImg.src}" alt="Uploaded image" class="img-fluid rounded" style="max-height: 200px;">
+                    </div>`;
+                chatBody.appendChild(userMsg);
+
+                const thinkingEl = document.createElement('div');
+                thinkingEl.className = 'message assistant-message thinking';
+                thinkingEl.innerHTML = `<div class="dot"></div><div class="dot"></div><div class="dot"></div>`;
+                chatBody.appendChild(thinkingEl);
+                chatBody.scrollTop = chatBody.scrollHeight;
+
+                const formData = new FormData();
+                formData.append('text', '');
+                formData.append('image', file);
+                formData.append('language', currentLanguage);
+                formData.append('preferred_agent', currentSelectedAgent);
+                if (currentSelectedAgent === 'BRAIN_STROKE_AGENT') {
+                    formData.append('stroke_task', getSelectedStrokeTask());
+                }
+
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData,
+                    credentials: 'include'
+                });
+                const data = await response.json();
+                thinkingEl.remove();
+
+                const botMsg = document.createElement('div');
+                botMsg.className = 'message assistant-message';
+                const textHtml = (window.marked ? marked.parse(data.response || '') : (data.response || '').replace(/\n/g, '<br>'));
+                let imgHtml = '';
+                if (data.result_image) {
+                    imgHtml = `<div class="mt-3"><img src="${data.result_image}" alt="Result image" class="img-fluid rounded" style="max-height: 400px;"></div>`;
+                }
+                botMsg.innerHTML = `<div>${textHtml}</div>${imgHtml}`;
+                chatBody.appendChild(botMsg);
+                chatBody.scrollTop = chatBody.scrollHeight;
+            } catch (err) {
+                console.error('[CV Upload] fallback 路径失败：', err);
+                if (typeof showToast === 'function') {
+                    showToast('分析失败：' + err.message, 'danger');
+                }
+            } finally {
+                collapseCVPanel();
+            }
+        }
 
         // Initialize UI mode once on load
         applyAgentUIMode(currentSelectedAgent);
@@ -1761,6 +2165,10 @@
                     formData.append('image', imageUpload.files[0]);
                     formData.append('language', currentLanguage);
                     formData.append('preferred_agent', currentSelectedAgent);
+                    // 仅 BRAIN_STROKE_AGENT 才有意义；其他 agent 后端会忽略此字段。
+                    if (currentSelectedAgent === 'BRAIN_STROKE_AGENT') {
+                        formData.append('stroke_task', getSelectedStrokeTask());
+                    }
 
                     // Send to backend using the /upload endpoint
                     response = await fetch('/upload', {
@@ -1824,9 +2232,21 @@
                     assistantHtml += `
                             <div class="mt-3 p-3 border rounded bg-light">
                                 <p><strong>${translations[currentLanguage].humanValReq}</strong></p>
-                                <button class="btn btn-success btn-sm validate-btn" data-validation="yes">${translations[currentLanguage].valYes}</button>
-                                <button class="btn btn-danger btn-sm validate-btn" data-validation="no">${translations[currentLanguage].valNo}</button>
-                                <textarea class="form-control mt-2 validation-comments" rows="2" placeholder="${translations[currentLanguage].valComments}"></textarea>
+                                <div class="d-flex align-items-center flex-wrap gap-2">
+                                    <button class="btn btn-success btn-sm validate-btn" data-validation="yes">${translations[currentLanguage].valYes}</button>
+                                    <button class="btn btn-danger btn-sm validate-btn" data-validation="no">${translations[currentLanguage].valNo}</button>
+                                    <button type="button" class="val-comment-toggle ms-auto"
+                                            aria-expanded="false">
+                                        <i class="fas fa-comment-dots me-1"></i>
+                                        <span class="val-comment-toggle-label">${translations[currentLanguage].valToggleExpand}</span>
+                                        <i class="fas fa-chevron-down chevron ms-1"></i>
+                                    </button>
+                                </div>
+                                <div class="val-comment-wrap">
+                                    <div class="val-comment-inner">
+                                        <textarea class="form-control validation-comments" rows="2" placeholder="${translations[currentLanguage].valComments}"></textarea>
+                                    </div>
+                                </div>
                             </div>
                         `;
                 }
@@ -1875,6 +2295,28 @@
                             await sendValidation(validation, comments);
                         });
                     });
+
+                    // 评论框展开/关闭：只对最新追加的这条消息内的 toggle 生效，
+                    // 避免重复绑定导致历史消息状态被重置。
+                    const toggle = assistantMessageElement.querySelector('.val-comment-toggle');
+                    if (toggle) {
+                        const wrap = assistantMessageElement.querySelector('.val-comment-wrap');
+                        const label = toggle.querySelector('.val-comment-toggle-label');
+                        toggle.addEventListener('click', function () {
+                            const expanded = wrap.classList.toggle('is-expanded');
+                            toggle.classList.toggle('is-expanded', expanded);
+                            toggle.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+                            if (label) {
+                                label.innerText = expanded
+                                    ? translations[currentLanguage].valToggleCollapse
+                                    : translations[currentLanguage].valToggleExpand;
+                            }
+                            if (expanded) {
+                                const ta = wrap.querySelector('textarea');
+                                if (ta) setTimeout(() => ta.focus(), 180);
+                            }
+                        });
+                    }
                 }
 
                 // Get the play button and add click event to speak text

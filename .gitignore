@@ -185,3 +185,5 @@ uploads/
 
 # environment variants
 .env.*
+# 但模板文件需要进版本库，作为新成员的配置参考
+!.env.example

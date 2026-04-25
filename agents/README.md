@@ -9,8 +9,65 @@
 ---
  
 ## 📚 Table of Contents
+- [Computer Vision Agents (heyi-Trans-master Integration)](#cv-agents)
 - [Human-in-the-loop Validation Agent](#human-in-the-loop)
 - [Research-papers-and-documents-used-for-RAG-Citations](#citations)
+
+---
+
+## 📌 Computer Vision Agents — `heyi-Trans-master` Integration <a name="cv-agents"></a>
+
+Both brain-imaging agents (`BRAIN_TUMOR_AGENT`, `BRAIN_STROKE_AGENT`) are now wired up to the
+in-repo general-purpose Vision Transformer framework [`heyi-Trans-master`](../heyi-Trans-master/README.md).
+The three-stage reserved interface (`segment_image` → `mark_lesion` → `diagnose`) is fully implemented;
+`IMPLEMENTED = True` on both agent classes.
+
+### Module layout
+
+```
+agents/image_analysis_agent/
+├── heyi_adapter.py                        ← Bridge to heyi-Trans-master (ViT encoder + binary seg decoder)
+├── image_classifier.py                    ← GLM-4V based router (is this a brain MRI / CT?)
+├── brain_tumor_agent/
+│   ├── brain_tumor_inference.py           ← BrainTumorAgent (IMPLEMENTED = True)
+│   └── models/                            ← Drop `brain_tumor_segmentation.pth` here
+└── brain_stroke_agent/
+    ├── brain_stroke_inference.py          ← BrainStrokeAgent (IMPLEMENTED = True)
+    └── models/                            ← Drop `brain_stroke_segmentation.pth` here
+```
+
+### Per-stage behaviour
+
+| Stage | Implementation |
+|-------|----------------|
+| `segment_image` | Loads image → resize 224×224 → `ViTEncoder` (from `heyi-Trans-master`) → `patch_features (B,196,768)` → lightweight decoder (`LayerNorm + Linear + GELU + Linear`) → bilinear upsample to original resolution → binary mask `[H,W]` |
+| `mark_lesion` | Semi-transparent color overlay on the lesion region + yellow contour outline; saved to `uploads/brain_{tumor,stroke}_output/*.png` (already static-mounted by `app.py`) |
+| `diagnose` | Uses mask statistics (region count, area ratio, centroid location, bounding box) to produce a structured Chinese diagnosis text. Adds an explicit ⚠️ *demo-mode warning* if no fine-tuned weights are loaded, so the output is never mistaken for clinical advice. |
+
+### Weights
+
+- File names are **fixed** by `config.py → MedicalCVConfig`:
+  - `agents/image_analysis_agent/brain_tumor_agent/models/brain_tumor_segmentation.pth`
+  - `agents/image_analysis_agent/brain_stroke_agent/models/brain_stroke_segmentation.pth`
+- No weights = **Demo mode** (ImageNet-pretrained ViT features + untuned head). End-to-end pipeline runs, but segmentation is noisy.
+- With compatible weights = **Production mode**. Adapter supports 4 state-dict formats automatically; see the top-level README for details.
+
+### Data flow (end to end)
+
+```
+User uploads image
+  → POST /upload  (app.py)
+  → process_query (agent_decision.py)
+    → ImageClassifier (GLM-4V determines if brain MRI / CT)
+    → BRAIN_TUMOR_AGENT / BRAIN_STROKE_AGENT node
+      → config.image_analyzer.detect_brain_tumor(image_path)
+        → BrainTumorAgent.predict()
+          → segment_image()  → HeyiVisionAdapter.infer_mask()
+          → mark_lesion()    → HeyiVisionAdapter.overlay()  → uploads/brain_tumor_output/brain_tumor_plot.png
+          → diagnose()       → Chinese diagnosis text with optional demo-mode warning
+    → Frontend shows { response: text, result_image: url } (rendered side-by-side with the original image)
+    → Human-in-the-Loop validation gate (see below)
+```
 
 ---
 

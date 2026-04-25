@@ -131,14 +131,15 @@ def create_agent_graph():
         current_input = state["current_input"]
         has_image = False
         image_type = None
-        
+        preferred_agent = state.get("preferred_agent", "AUTO") or "AUTO"
+
         # Get the text from the input
         input_text = ""
         if isinstance(current_input, str):
             input_text = current_input
         elif isinstance(current_input, dict):
             input_text = current_input.get("text", "")
-        
+
         # Check input through guardrails if text is present
         if input_text:
             pass
@@ -154,7 +155,30 @@ def create_agent_graph():
             #         "image_type": None,
             #         "bypass_routing": True  # flag to end flow
             #     }
-        
+
+        # ---- 人工验证响应专项处理 ----------------------------------------
+        # /validate 端点会把用户点击的 "是/否" 包装成
+        # "Validation result: yes/no [Comments: ...]"（中文则 "验证结果: ..."）
+        # 再调用 process_query。如果让它走默认路由，LLM 经常会把它继续路由回
+        # BRAIN_STROKE_AGENT / BRAIN_TUMOR_AGENT，但此时：
+        #   - current_input 是字符串，不含 image 字段
+        #   - 上一轮的临时图像文件已经被 app.py /upload 的 finally 块清理
+        # 结果就是再跑一遍图像 agent，返回"未接收到图像"的占位文案。
+        #
+        # 修复：直接强制路由到 CONVERSATION_AGENT，由它结合历史上下文生成
+        # 一段对验证结果的礼貌回复，避开重跑图像流水线。
+        stripped = (input_text or "").strip().lower()
+        looks_like_validation = (
+            stripped.startswith("validation result:")
+            or stripped.startswith("验证结果")
+        )
+        if looks_like_validation and preferred_agent in ("AUTO", "CONVERSATION_AGENT"):
+            print(
+                "[analyze_input] 检测到人工验证响应输入，强制路由到 CONVERSATION_AGENT，"
+                "避免重新跑图像 agent 触发'未接收到图像'分支。"
+            )
+            preferred_agent = "CONVERSATION_AGENT"
+
         # Original image processing code
         if isinstance(current_input, dict) and "image" in current_input:
             has_image = True
@@ -162,12 +186,13 @@ def create_agent_graph():
             image_type_response = AgentConfig.image_analyzer.analyze_image(image_path)
             image_type = image_type_response['image_type']
             print("ANALYZED IMAGE TYPE: ", image_type)
-        
+
         return {
             **state,
             "has_image": has_image,
             "image_type": image_type,
-            "bypass_routing": False  # Explicitly set to False for normal flow
+            "bypass_routing": False,  # Explicitly set to False for normal flow
+            "preferred_agent": preferred_agent,
         }
     
     def check_if_bypassing(state: AgentState) -> str:
@@ -566,9 +591,19 @@ def create_agent_graph():
         current_input = state["current_input"]
         image_path = current_input.get("image", None) if isinstance(current_input, dict) else None
         language = state.get("language", "en")
+        # 卒中亚型 (auto/hemorrhage/ischemia)：由上游分类模块或前端显式给定。
+        # 其他模块负责"先判断缺血/出血再调用"时，这里直接接收并下发。
+        stroke_task = (
+            current_input.get("stroke_task")
+            if isinstance(current_input, dict)
+            else None
+        )
+        print(f"  -> stroke_task = {stroke_task!r}")
 
         if image_path:
-            pipeline_result = AgentConfig.image_analyzer.detect_brain_stroke(image_path)
+            pipeline_result = AgentConfig.image_analyzer.detect_brain_stroke(
+                image_path, task=stroke_task
+            )
         else:
             pipeline_result = {
                 "status": "error",

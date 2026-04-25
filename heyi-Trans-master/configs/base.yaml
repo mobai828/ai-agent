@@ -1,0 +1,36 @@
+# 基础配置 - Universal Vision Transformer
+project:
+  name: "vision_thransformer"
+  version: "1.0.0"
+  description: "通用视觉大模型 - 支持分类、检测、分割、检索"
+
+model:
+  # 视觉编码器
+  vision_encoder:
+    type: "vit_base"  # vit_base, resnet50, convnext
+    pretrained: true
+    image_size: 224
+    hidden_dim: 768
+    
+  # 任务配置
+  tasks:
+    classification:
+      enabled: true
+      num_classes: 1000
+      
+    detection:
+      enabled: true
+      num_classes: 91  # COCO类别数
+      
+    segmentation:
+      enabled: true
+      num_classes: 133  # COCO分割类别数
+      
+    retrieval:
+      enabled: true
+      embedding_dim: 512
+      
+training:
+  batch_size: 32
+  learning_rate: 1e-4
+  device: "cuda"

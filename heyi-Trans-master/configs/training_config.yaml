@@ -1,0 +1,45 @@
+model:
+  vision_encoder:
+    type: vit_encoder
+    model_name: vit_b_16
+    pretrained: true
+    freeze_backbone: false
+  tasks:
+    classification:
+      enabled: true
+      num_classes: 1000
+      input_dim: 768
+    retrieval:
+      enabled: true
+      output_dim: 128
+      input_dim: 768
+    detection:
+      enabled: true
+      num_classes: 80
+      input_dim: 768
+    segmentation:
+      enabled: true
+      num_classes: 21
+      input_dim: 768
+
+data:
+  classification:
+    train_root: path/to/your/classification/train
+    val_root: path/to/your/classification/val
+  retrieval:
+    train_root: path/to/your/retrieval/train
+    val_root: path/to/your/retrieval/val
+  detection:
+    train_root: path/to/your/detection/train
+    val_root: path/to/your/detection/val
+  segmentation:
+    train_root: path/to/your/segmentation/train
+    val_root: path/to/your/segmentation/val
+
+training:
+  batch_size: 16  # 根据您的GPU内存调整
+  learning_rate: 1e-4
+  weight_decay: 0.01
+  max_epochs: 50
+  save_interval: 10
+  num_workers: 4  # 根据您的CPU核心数调整

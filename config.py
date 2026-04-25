@@ -122,6 +122,34 @@ class MedicalCVConfig:
         self.brain_tumor_output_path = "./uploads/brain_tumor_output/brain_tumor_plot.png"
         self.brain_stroke_output_dir = "./uploads/brain_stroke_output"
         self.brain_stroke_output_path = "./uploads/brain_stroke_output/brain_stroke_plot.png"
+
+        # ---- heyi-Trans-master 通用视觉模型相关配置 ----
+        # 输入分辨率（ViT-B/16 默认 224；patch_size=16，需能被整除）
+        self.heyi_image_size = 224
+        # 运行设备："cuda" / "cpu" / None（None 时自动检测）
+        self.heyi_device = None
+        # 骨干网络名称（对应 heyi ViTEncoder 支持的模型）
+        self.heyi_backbone = "vit_b_16"
+        # 是否允许使用 ImageNet 预训练 backbone（无微调权重时作为演示降级）
+        self.heyi_allow_pretrained_fallback = True
+
+        # ---- Heyi 远程分割服务（同学部署的医疗图像分割 API v2.0）----
+        # 远程服务根地址；为空字符串则视为未配置，直接走本地 adapter。
+        # 推荐值见 .env.example，请通过 .env 配置而非在此硬编码。
+        self.heyi_remote_url = os.getenv("HEYI_REMOTE_URL", "").strip()
+        # 总开关：关闭后无论远程是否可达，都只走本地 adapter。
+        self.heyi_remote_enabled = _to_bool(
+            os.getenv("HEYI_REMOTE_ENABLED"), default=True
+        )
+        # /segment 总超时（秒）；3D NIfTI 推理耗时较长，默认给 120s。
+        self.heyi_remote_timeout = float(os.getenv("HEYI_REMOTE_TIMEOUT", "120"))
+        # /health 探活超时（秒）；必须短，否则每次请求都会卡 2 分钟。
+        self.heyi_remote_health_timeout = float(
+            os.getenv("HEYI_REMOTE_HEALTH_TIMEOUT", "3")
+        )
+        # 默认 task 参数：auto / hemorrhage / ischemia。
+        self.heyi_remote_task = os.getenv("HEYI_REMOTE_TASK", "auto").strip() or "auto"
+
         self.llm = ChatOpenAI(
             model="glm-4v-flash",
             api_key=ZHIPU_API_KEY,

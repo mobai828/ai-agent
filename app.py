@@ -1,7 +1,7 @@
 import os
 import uuid
 import tempfile
-from typing import Dict, Union, Optional, List
+from typing import Dict, Union, Optional, List, Literal
 import glob
 import threading
 import time
@@ -12,7 +12,7 @@ from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends, Req
 from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 import uvicorn
 import requests
@@ -110,6 +110,58 @@ class SpeechRequest(BaseModel):
     language: str = "en"
 
 
+class BrainStrokeStages(BaseModel):
+    segmentation: bool = Field(
+        ...,
+        description="阶段1：图像分割是否成功完成。"
+    )
+    lesion_marking: bool = Field(
+        ...,
+        description="阶段2：病灶标记图是否成功生成。"
+    )
+    ai_diagnosis: bool = Field(
+        ...,
+        description="阶段3：AI 初步结论文本是否成功生成。"
+    )
+
+
+class BrainStrokeSegmentResponse(BaseModel):
+    status: Literal["success", "error", "not_implemented"] = Field(
+        ...,
+        description="本次处理状态。"
+    )
+    task: Literal["auto", "hemorrhage", "ischemia"] = Field(
+        ...,
+        description="实际执行的卒中子任务。"
+    )
+    source: Optional[Literal["remote", "local"]] = Field(
+        default=None,
+        description="分割来源：remote=远程 Heyi 服务；local=本地 fallback。"
+    )
+    stages: BrainStrokeStages = Field(
+        ...,
+        description="三阶段流程执行状态。"
+    )
+    diagnosis: str = Field(
+        ...,
+        description="AI 初步结论（markdown 文本）。"
+    )
+    message: str = Field(
+        ...,
+        description="简要状态消息，便于日志和上游展示。"
+    )
+    result_image: Optional[str] = Field(
+        default=None,
+        description="分割结果图 URL（通常带 ?v=时间戳 防缓存）。"
+    )
+
+
+class APIErrorResponse(BaseModel):
+    status: Literal["error"] = "error"
+    message: str
+    task: Optional[Literal["auto", "hemorrhage", "ischemia"]] = None
+
+
 def _extract_response_text(response_data: Dict) -> str:
     messages = response_data.get("messages", [])
     if messages:
@@ -122,16 +174,35 @@ def _extract_response_text(response_data: Dict) -> str:
 
 
 def _attach_brain_cv_result_image(result: Dict, response_data: Dict) -> None:
-    """If the reserved-interface brain CV agents produced a result image, expose it to the frontend."""
+    """If the reserved-interface brain CV agents produced a result image, expose it to the frontend.
+
+    结果图固定写到 ``brain_*_plot.png``，文件名不变，浏览器会按 URL 缓存导致
+    "第二次上传仍然显示第一次的结果"。这里在 URL 后追加 ``?v=<mtime>``，
+    让每次新写入的文件对应一个新的 URL，强制前端重新拉取。
+    """
     agent_name = response_data.get("agent_name", "") or ""
     if "BRAIN_TUMOR_AGENT" in agent_name:
         plot_path = os.path.join(BRAIN_TUMOR_OUTPUT, "brain_tumor_plot.png")
         if os.path.exists(plot_path):
-            result["result_image"] = "/uploads/brain_tumor_output/brain_tumor_plot.png"
+            result["result_image"] = _cache_busted_url(
+                "/uploads/brain_tumor_output/brain_tumor_plot.png", plot_path
+            )
     elif "BRAIN_STROKE_AGENT" in agent_name:
         plot_path = os.path.join(BRAIN_STROKE_OUTPUT, "brain_stroke_plot.png")
         if os.path.exists(plot_path):
-            result["result_image"] = "/uploads/brain_stroke_output/brain_stroke_plot.png"
+            result["result_image"] = _cache_busted_url(
+                "/uploads/brain_stroke_output/brain_stroke_plot.png", plot_path
+            )
+
+
+def _cache_busted_url(public_url: str, file_path: str) -> str:
+    """给静态资源 URL 追加基于 mtime 的版本戳，避免浏览器缓存旧结果。"""
+    try:
+        version = int(os.path.getmtime(file_path) * 1000)
+    except OSError:
+        version = int(time.time() * 1000)
+    sep = "&" if "?" in public_url else "?"
+    return f"{public_url}{sep}v={version}"
 
 
 def _build_offline_response(query: Union[str, Dict], language: str, reason: str = "") -> Dict:
@@ -210,6 +281,36 @@ def chat(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+SUPPORTED_STROKE_TASKS = {"auto", "hemorrhage", "ischemia"}
+
+
+def _normalize_stroke_task(raw: Optional[str]) -> Optional[str]:
+    """归一化前端 / 直连接口传入的 stroke_task 字段。
+
+    支持中英文别名（出血/缺血等），统一映射为远程服务能识别的小写 token。
+    输入为空 / None 返回 None，由下游决定是否走默认值。
+    """
+    if not raw:
+        return None
+    cleaned = str(raw).strip().lower()
+    aliases = {
+        "出血": "hemorrhage",
+        "出血灶": "hemorrhage",
+        "hemorrhagic": "hemorrhage",
+        "haemorrhage": "hemorrhage",
+        "缺血": "ischemia",
+        "缺血灶": "ischemia",
+        "ischemic": "ischemia",
+        "ischaemia": "ischemia",
+        "infarction": "ischemia",
+        "梗死": "ischemia",
+    }
+    cleaned = aliases.get(cleaned, cleaned)
+    if cleaned not in SUPPORTED_STROKE_TASKS:
+        return None
+    return cleaned
+
+
 @app.post("/upload")
 async def upload_image(
         response: Response,
@@ -217,9 +318,16 @@ async def upload_image(
         text: str = Form(""),
         language: str = Form("en"),
         preferred_agent: str = Form("AUTO"),
+        stroke_task: Optional[str] = Form(None),
         session_id: Optional[str] = Cookie(None)
 ):
-    """Process medical image uploads with optional text input."""
+    """Process medical image uploads with optional text input.
+
+    Args:
+        stroke_task: 仅对 BRAIN_STROKE_AGENT 生效，``auto`` / ``hemorrhage`` /
+            ``ischemia``。推荐由上游分类模块（"判断缺血或出血"的板块）
+            显式给定，避免远程服务在 ``auto`` 下做次优判断。
+    """
     # Validate file type
     if not allowed_file(image.filename):
         return JSONResponse(
@@ -247,6 +355,8 @@ async def upload_image(
     if not session_id:
         session_id = str(uuid.uuid4())
 
+    normalized_stroke_task = _normalize_stroke_task(stroke_task)
+
     # Save file securely
     filename = secure_filename(f"{uuid.uuid4()}_{image.filename}")
     file_path = os.path.join(UPLOAD_FOLDER, filename)
@@ -254,13 +364,13 @@ async def upload_image(
         f.write(file_content)
     if config.api.force_offline_mode:
         return _build_offline_response(
-            query={"text": text, "image": file_path},
+            query={"text": text, "image": file_path, "stroke_task": normalized_stroke_task},
             language=language,
             reason="force_offline_mode_enabled"
         )
 
     try:
-        query = {"text": text, "image": file_path}
+        query = {"text": text, "image": file_path, "stroke_task": normalized_stroke_task}
         response_data = process_query(query, language=language, preferred_agent=preferred_agent)
         response_text = _extract_response_text(response_data)
 
@@ -270,7 +380,8 @@ async def upload_image(
         result = {
             "status": "success",
             "response": response_text,
-            "agent": response_data.get("agent_name", "UNKNOWN_AGENT")
+            "agent": response_data.get("agent_name", "UNKNOWN_AGENT"),
+            "stroke_task": normalized_stroke_task,
         }
 
         # Reserved-interface brain CV agents: surface result image if generated
@@ -287,7 +398,7 @@ async def upload_image(
     except Exception as e:
         logger.exception("Online upload pipeline failed")
         if config.api.enable_offline_fallback:
-            query = {"text": text, "image": file_path}
+            query = {"text": text, "image": file_path, "stroke_task": normalized_stroke_task}
             return _build_offline_response(
                 query=query,
                 language=language,
@@ -301,6 +412,148 @@ async def upload_image(
                 os.remove(file_path)
         except Exception as remove_error:
             print(f"Failed to remove temporary file: {str(remove_error)}")
+
+
+@app.post(
+    "/api/brain_stroke/segment",
+    response_model=BrainStrokeSegmentResponse,
+    responses={
+        200: {
+            "description": "脑卒中三阶段流水线执行成功（直连接口）。",
+            "content": {
+                "application/json": {
+                    "example": {
+                        "status": "success",
+                        "task": "ischemia",
+                        "source": "remote",
+                        "stages": {
+                            "segmentation": True,
+                            "lesion_marking": True,
+                            "ai_diagnosis": True
+                        },
+                        "diagnosis": "**AI 初步结论（脑卒中检测）**\n\n- 任务类型：**缺血灶（ischemia）**\n- 共检测到 **1** 个可疑区域；主病灶位于 **右脑上部**。",
+                        "message": "脑卒中检测完成（远程 Heyi 分割服务，task=ischemia）。",
+                        "result_image": "/uploads/brain_stroke_output/brain_stroke_plot.png?v=1714032123456"
+                    }
+                }
+            }
+        },
+        400: {
+            "description": "请求参数错误（例如文件格式不支持）。",
+            "model": APIErrorResponse,
+        },
+        413: {
+            "description": "文件体积超过限制。",
+            "model": APIErrorResponse,
+        },
+        500: {
+            "description": "服务端处理异常。",
+            "model": APIErrorResponse,
+        },
+    },
+)
+async def api_brain_stroke_segment(
+    image: UploadFile = File(...),
+    task: str = Form("auto"),
+):
+    """脑卒中分割直连接口（**给负责缺血/出血判断的外部板块调用**）。
+
+    与 ``/upload`` 不同，本接口绕过对话路由，直接返回脑卒中三阶段流水线
+    的结构化结果，便于其他系统/微服务集成。
+
+    Form 参数：
+        image (file): 待分析的医学影像（PNG / JPG / JPEG）。
+        task  (str):  ``auto`` / ``hemorrhage`` / ``ischemia``。
+                      上游建议**显式**给值；缺省 ``auto`` 仅作为兜底。
+
+    返回值：
+        ```json
+        {
+          "status": "success" | "error" | "not_implemented",
+          "task":   "auto" | "hemorrhage" | "ischemia",
+          "source": "remote" | "local",
+          "diagnosis": "**AI 初步结论…**",
+          "stages":   {"segmentation": true, "lesion_marking": true, "ai_diagnosis": true},
+          "result_image": "/uploads/brain_stroke_output/brain_stroke_plot.png?v=...",
+          "message": "脑卒中检测完成（远程 Heyi 分割服务，task=ischemia）。"
+        }
+        ```
+    """
+    if not allowed_file(image.filename):
+        return JSONResponse(
+            status_code=400,
+            content={
+                "status": "error",
+                "message": "Unsupported file type. Allowed formats: PNG, JPG, JPEG",
+            },
+        )
+
+    file_content = await image.read()
+    if len(file_content) > config.api.max_image_upload_size * 1024 * 1024:
+        return JSONResponse(
+            status_code=413,
+            content={
+                "status": "error",
+                "message": (
+                    f"File too large. Maximum size allowed: "
+                    f"{config.api.max_image_upload_size}MB"
+                ),
+            },
+        )
+
+    normalized_task = _normalize_stroke_task(task) or "auto"
+
+    filename = secure_filename(f"{uuid.uuid4()}_{image.filename}")
+    file_path = os.path.join(UPLOAD_FOLDER, filename)
+    with open(file_path, "wb") as f:
+        f.write(file_content)
+
+    try:
+        from agents.agent_decision import AgentConfig as _AC
+
+        pipeline_result = _AC.image_analyzer.detect_brain_stroke(
+            file_path, task=normalized_task
+        )
+
+        stages = pipeline_result.get("stages", {}) or {}
+        payload: Dict = {
+            "status": pipeline_result.get("status", "error"),
+            "task": pipeline_result.get("task", normalized_task),
+            "source": pipeline_result.get("source"),
+            "stages": {
+                "segmentation": bool(stages.get("segmentation", False)),
+                "lesion_marking": bool(stages.get("lesion_marking", False)),
+                "ai_diagnosis": bool(stages.get("ai_diagnosis", False)),
+            },
+            "diagnosis": pipeline_result.get("diagnosis", ""),
+            "message": pipeline_result.get("message", ""),
+        }
+
+        plot_path = os.path.join(BRAIN_STROKE_OUTPUT, "brain_stroke_plot.png")
+        if os.path.exists(plot_path):
+            payload["result_image"] = _cache_busted_url(
+                "/uploads/brain_stroke_output/brain_stroke_plot.png", plot_path
+            )
+
+        return payload
+    except Exception as e:  # noqa: BLE001
+        logger.exception("/api/brain_stroke/segment failed")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "error",
+                "task": normalized_task,
+                "message": f"脑卒中检测执行异常：{e}",
+            },
+        )
+    finally:
+        try:
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        except Exception as remove_error:  # noqa: BLE001
+            logger.warning(
+                "[/api/brain_stroke/segment] 临时文件清理失败: %s", remove_error
+            )
 
 
 @app.post("/validate")
