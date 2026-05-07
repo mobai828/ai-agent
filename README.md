@@ -119,9 +119,12 @@ cp .env.example .env
 | Env var | Required | Default | Notes |
 |---------|:---:|---------|-------|
 | `ZHIPU_API_KEY` | ✅ | — | LLM provider |
+| `ZHIPU_BASE_URL` | ⛔ | `https://open.bigmodel.cn/api/paas/v4/` | Custom gateway (optional) |
 | `TAVILY_API_KEY` | ✅ | — | Web Search Agent |
 | `QDRANT_URL` | ⚠️ | — | Required only when using RAG |
 | `QDRANT_API_KEY` | ⚠️ | — | Required only when using RAG |
+| `BAIDU_API_KEY` | ⚠️ | — | Required only when using `/transcribe` |
+| `BAIDU_SECRET_KEY` | ⚠️ | — | Required only when using `/transcribe` |
 | `HEYI_REMOTE_URL` | ⛔ | _empty_ | Empty → skip remote, use local fallback |
 | `HEYI_REMOTE_ENABLED` | ⛔ | `true` | Master switch |
 | `HEYI_REMOTE_TIMEOUT` | ⛔ | `120` | `/segment` total timeout (s) |
@@ -129,6 +132,12 @@ cp .env.example .env
 | `HEYI_REMOTE_TASK` | ⛔ | `auto` | Default `task`: `auto` / `hemorrhage` / `ischemia` |
 | `FORCE_OFFLINE_MODE` | ⛔ | `false` | Skip all online calls; use offline fallback agent |
 | `ENABLE_OFFLINE_FALLBACK` | ⛔ | `true` | Auto-fallback when online pipeline fails |
+
+Local secret storage best practice:
+
+- Keep all personal keys in local `.env` only (already ignored by `.gitignore`).
+- Commit only `.env.example` with blank placeholders.
+- If you need a personal backup, create another local file such as `.env.private.backup` (also ignored by `.gitignore` due to `.env.*`) and never commit it.
 
 ### 4. Run
 

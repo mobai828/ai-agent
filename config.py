@@ -18,11 +18,22 @@ def _to_bool(value: str, default: bool = False) -> bool:
     if value is None:
         return default
     return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _required_env(name: str) -> str:
+    value = os.getenv(name, "").strip()
+    if not value:
+        raise ValueError(
+            f"Missing required environment variable: {name}. "
+            "Please set it in your local .env file."
+        )
+    return value
+
 # Load environment variables from .env file
 load_dotenv()
 
-ZHIPU_API_KEY = "690a8432895d43b29a3c4259556ed696.cX6szzSrapTt5USb"
-ZHIPU_BASE_URL = "https://open.bigmodel.cn/api/paas/v4/"
+ZHIPU_API_KEY = _required_env("ZHIPU_API_KEY")
+ZHIPU_BASE_URL = os.getenv("ZHIPU_BASE_URL", "https://open.bigmodel.cn/api/paas/v4/")
 
 class AgentDecisoinConfig:
     def __init__(self):
@@ -61,8 +72,8 @@ class RAGConfig:
         self.vector_local_path = "./data/qdrant_db"  # Add this with a default value
         self.doc_local_path = "./data/docs_db"
         self.parsed_content_dir = "./data/parsed_docs"
-        self.url = "https://ca42b516-972f-4d16-8ee3-9d9431766498.us-west-2-0.aws.cloud.qdrant.io:6333"
-        self.api_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2Nlc3MiOiJtIiwic3ViamVjdCI6ImFwaS1rZXk6NjVjNmY0YjYtZDgwOS00OWE5LWJlZmQtZDUzM2ZhNTgyNWI5In0.-vBLt9If2t4F-iL4eagx3gwb7I7YjQPNuzyRDuwHH04"
+        self.url = os.getenv("QDRANT_URL", "").strip()
+        self.api_key = os.getenv("QDRANT_API_KEY", "").strip()
         self.collection_name = "medical_assistance_rag"  # Ensure a valid name
         self.chunk_size = 512  # Modify based on documents and performance
         self.chunk_overlap = 50  # Modify based on documents and performance
@@ -159,10 +170,10 @@ class MedicalCVConfig:
 
 class SpeechConfig:
     def __init__(self):
-        self.eleven_labs_api_key = os.getenv("ELEVEN_LABS_API_KEY")  # Replace with your actual key
+        self.eleven_labs_api_key = os.getenv("ELEVEN_LABS_API_KEY")
         self.eleven_labs_voice_id = "21m00Tcm4TlvDq8ikWAM"    # Default voice ID (Rachel)
-        self.baidu_api_key = "OSP8KQ8n1DN5cGYE0WDOqSTt"
-        self.baidu_secret_key = "31sK7hNGN9oZ8zWC739AA6prPuiU2KGH"
+        self.baidu_api_key = os.getenv("BAIDU_API_KEY", "").strip()
+        self.baidu_secret_key = os.getenv("BAIDU_SECRET_KEY", "").strip()
 
 class ValidationConfig:
     def __init__(self):
@@ -207,7 +218,7 @@ class Config:
         self.validation = ValidationConfig()
         self.ui = UIConfig()
         self.eleven_labs_api_key = os.getenv("ELEVEN_LABS_API_KEY")
-        self.tavily_api_key = "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"
+        self.tavily_api_key = _required_env("TAVILY_API_KEY")
         self.max_conversation_history = 20  # Include last 20 messsages (10 Q&A pairs) in history
 
 # # Example usage
