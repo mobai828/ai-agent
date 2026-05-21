@@ -475,6 +475,7 @@ The adapter accepts these state-dict layouts:
 
 | Document | Purpose |
 |----------|---------|
+| [`docs/PROJECT_GUIDE.md`](docs/PROJECT_GUIDE.md) | Detailed Chinese project guide covering architecture, modules, configuration and maintenance |
 | [`docs/API_KEYS.md`](docs/API_KEYS.md) | External API providers, required environment variables and call sites |
 | [`docs/LANGGRAPH_CHECKPOINT.md`](docs/LANGGRAPH_CHECKPOINT.md) | LangGraph checkpoint architecture, persistence, cleanup and operations |
 | [`agents/README.md`](agents/README.md) | Agent-level module overview |
