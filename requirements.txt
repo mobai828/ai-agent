@@ -113,6 +113,7 @@ langchain-text-splitters
 langdetect
 langgraph
 langgraph-checkpoint
+langgraph-checkpoint-sqlite
 langgraph-prebuilt
 langgraph-sdk
 langsmith

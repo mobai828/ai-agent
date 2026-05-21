@@ -73,21 +73,19 @@ User uploads image
 
 ## 📌 Human-in-the-loop validation of Medical Computer Vision Diagnosis Agents' Outputs <a name="human-in-the-loop"></a>
 
-In `agent_decision.py`:
+Current implementation:
 
-1. Interrupt the workflow when human validation is needed
-2. Store the interrupted state in memory
-3. Add endpoints to expose pending validations and submit validation decisions
-4. Resume the workflow after the human has provided feedback
+1. CV agent outputs are explicitly marked as requiring human validation.
+2. The frontend shows a reviewer validation interface when validation is required.
+3. Reviewer feedback is submitted through `/validate`.
+4. Validation feedback is routed back to `CONVERSATION_AGENT` so the CV pipeline is not re-run on a missing image.
 
-On frontend:
+Planned evolution:
 
-1. Check if a response needs validation (needs_validation flag)
-2. If so, show a validation interface to the human reviewer
-3. Send the validation decision back through the /validate endpoint
-4. Continue the conversation
-
-Implemented a complete human-in-the-loop validation system using LangGraph's NodeInterrupt functionality, integrated with the backend and frontend.
+1. Replace the current validation flow with true LangGraph interruption/resume semantics.
+2. Use `compile(interrupt_before=["human_validation"])` and `Command(resume=...)`.
+3. Persist interrupted state through the existing LangGraph checkpoint backend.
+4. Resume from the human-validation node instead of re-entering the full graph.
 
 ---
 

@@ -35,30 +35,36 @@ load_dotenv()
 ZHIPU_API_KEY = _required_env("ZHIPU_API_KEY")
 ZHIPU_BASE_URL = os.getenv("ZHIPU_BASE_URL", "https://open.bigmodel.cn/api/paas/v4/")
 
+# MiMo (Xiaomi) Token Plan，OpenAI 兼容协议。
+# Token Plan key 形如 tp-xxx，需配合官方提供的区域 endpoint 使用。
+MIMO_API_KEY = _required_env("MIMO_API_KEY")
+MIMO_BASE_URL = os.getenv("MIMO_BASE_URL", "https://token-plan-cn.xiaomimimo.com/v1")
+MIMO_CHAT_MODEL = os.getenv("MIMO_CHAT_MODEL", "mimo-v2.5-pro")
+
 class AgentDecisoinConfig:
     def __init__(self):
         self.llm = ChatOpenAI(
-            model="glm-4-flash",
-            api_key=ZHIPU_API_KEY,
-            base_url=ZHIPU_BASE_URL,
+            model=MIMO_CHAT_MODEL,
+            api_key=MIMO_API_KEY,
+            base_url=MIMO_BASE_URL,
             temperature = 0.1  # Deterministic
         )
 
 class ConversationConfig:
     def __init__(self):
         self.llm = ChatOpenAI(
-            model="glm-4-flash",
-            api_key=ZHIPU_API_KEY,
-            base_url=ZHIPU_BASE_URL,
+            model=MIMO_CHAT_MODEL,
+            api_key=MIMO_API_KEY,
+            base_url=MIMO_BASE_URL,
             temperature = 0.7  # Creative but factual
         )
 
 class WebSearchConfig:
     def __init__(self):
         self.llm = ChatOpenAI(
-            model="glm-4-flash",
-            api_key=ZHIPU_API_KEY,
-            base_url=ZHIPU_BASE_URL,
+            model=MIMO_CHAT_MODEL,
+            api_key=MIMO_API_KEY,
+            base_url=MIMO_BASE_URL,
             temperature = 0.3  # Slightly creative but factual
         )
         self.context_limit = 20     # include last 20 messsages (10 Q&A pairs) in history
@@ -84,27 +90,27 @@ class RAGConfig:
             base_url=ZHIPU_BASE_URL
         )
         self.llm = ChatOpenAI(
-            model="glm-4-flash",
-            api_key=ZHIPU_API_KEY,
-            base_url=ZHIPU_BASE_URL,
+            model=MIMO_CHAT_MODEL,
+            api_key=MIMO_API_KEY,
+            base_url=MIMO_BASE_URL,
             temperature = 0.3  # Slightly creative but factual
         )
         self.summarizer_model = ChatOpenAI(
-            model="glm-4-flash",
-            api_key=ZHIPU_API_KEY,
-            base_url=ZHIPU_BASE_URL,
+            model=MIMO_CHAT_MODEL,
+            api_key=MIMO_API_KEY,
+            base_url=MIMO_BASE_URL,
             temperature = 0.5  # Slightly creative but factual
         )
         self.chunker_model = ChatOpenAI(
-            model="glm-4-flash",
-            api_key=ZHIPU_API_KEY,
-            base_url=ZHIPU_BASE_URL,
+            model=MIMO_CHAT_MODEL,
+            api_key=MIMO_API_KEY,
+            base_url=MIMO_BASE_URL,
             temperature = 0.0  # factual
         )
         self.response_generator_model = ChatOpenAI(
-            model="glm-4-flash",
-            api_key=ZHIPU_API_KEY,
-            base_url=ZHIPU_BASE_URL,
+            model=MIMO_CHAT_MODEL,
+            api_key=MIMO_API_KEY,
+            base_url=MIMO_BASE_URL,
             temperature = 0.3  # Slightly creative but factual
         )
         self.top_k = 5
@@ -162,7 +168,7 @@ class MedicalCVConfig:
         self.heyi_remote_task = os.getenv("HEYI_REMOTE_TASK", "auto").strip() or "auto"
 
         self.llm = ChatOpenAI(
-            model="glm-4v-flash",
+            model="glm-4.5-air",
             api_key=ZHIPU_API_KEY,
             base_url=ZHIPU_BASE_URL,
             temperature = 0.1  # Keep deterministic for classification tasks
@@ -199,6 +205,26 @@ class APIConfig:
         # When enabled, failures in online pipeline will always fallback locally.
         self.enable_offline_fallback = _to_bool(os.getenv("ENABLE_OFFLINE_FALLBACK"), default=True)
 
+class CheckpointConfig:
+    """LangGraph 持久化断点（Checkpoint）配置。
+
+    - backend: "sqlite" | "memory"
+        sqlite: 使用 SqliteSaver，进程重启后仍可恢复对话历史 / 中断点
+        memory: 使用 MemorySaver，仅进程内有效（测试 / 离线降级时用）
+    - sqlite_path: SQLite 文件路径，仅在 backend=="sqlite" 时生效
+    """
+
+    def __init__(self):
+        self.backend = os.getenv("LANGGRAPH_CHECKPOINT_BACKEND", "sqlite").strip().lower() or "sqlite"
+        self.sqlite_path = os.getenv(
+            "LANGGRAPH_CHECKPOINT_SQLITE_PATH",
+            "./data/langgraph_checkpoints.sqlite",
+        ).strip()
+        self.cleanup_enabled = _to_bool(os.getenv("LANGGRAPH_CHECKPOINT_CLEANUP_ENABLED"), default=True)
+        self.retention_days = int(os.getenv("LANGGRAPH_CHECKPOINT_RETENTION_DAYS", "30"))
+        self.cleanup_interval_seconds = int(os.getenv("LANGGRAPH_CHECKPOINT_CLEANUP_INTERVAL_SECONDS", "86400"))
+
+
 class UIConfig:
     def __init__(self):
         self.theme = "light"
@@ -217,6 +243,7 @@ class Config:
         self.speech = SpeechConfig()
         self.validation = ValidationConfig()
         self.ui = UIConfig()
+        self.checkpoint = CheckpointConfig()
         self.eleven_labs_api_key = os.getenv("ELEVEN_LABS_API_KEY")
         self.tavily_api_key = _required_env("TAVILY_API_KEY")
         self.max_conversation_history = 20  # Include last 20 messsages (10 Q&A pairs) in history

@@ -7,7 +7,7 @@ It dynamically routes user queries to the appropriate agent based on content and
 
 import json
 from typing import Dict, List, Optional, Any, Literal, TypedDict, Union, Annotated
-from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, BaseMessage
+from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, BaseMessage, RemoveMessage
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.runnables import RunnablePassthrough
@@ -23,19 +23,169 @@ from langgraph.checkpoint.memory import MemorySaver
 
 import cv2
 import numpy as np
+import logging
+import os
+import sqlite3
+import threading
+import time
 
 from config import Config
 
 load_dotenv()
 
+logger = logging.getLogger(__name__)
+
 # Load configuration
 config = Config()
 
-# Initialize memory
-memory = MemorySaver()
 
-# Specify a thread
-thread_config = {"configurable": {"thread_id": "1"}}
+# ---------------------------------------------------------------------------
+# LangGraph 持久化断点（Checkpoint）基础设施
+# ---------------------------------------------------------------------------
+# 设计要点：
+#   1. checkpointer 全进程单例：避免每次请求重建连接 / 表结构。
+#   2. 优先 SqliteSaver（持久化，进程重启不丢历史），导入失败 / 配置为
+#      "memory" 时回退 MemorySaver。
+#   3. 编译后的 graph 也做单例缓存：StateGraph.compile() 不便宜，原实现
+#      在每次 process_query 调用时都重新编译，是明显的性能浪费。
+#   4. thread_id 由调用方（FastAPI 端点）按 session_id 传入，彻底解决
+#      "所有用户共用 thread_id=1 串话" 的问题。
+# ---------------------------------------------------------------------------
+
+_checkpointer = None
+_compiled_graph = None
+_graph_lock = threading.Lock()
+
+
+def _build_sqlite_checkpointer(sqlite_path: str):
+    """尝试构造 SqliteSaver；失败则返回 None 由上层回退到 MemorySaver。"""
+    try:
+        from langgraph.checkpoint.sqlite import SqliteSaver  # type: ignore
+    except ImportError as exc:
+        logger.warning(
+            "langgraph-checkpoint-sqlite 未安装 (%s)，回退到 MemorySaver。"
+            "如需持久化请: pip install langgraph-checkpoint-sqlite",
+            exc,
+        )
+        return None
+
+    try:
+        os.makedirs(os.path.dirname(os.path.abspath(sqlite_path)) or ".", exist_ok=True)
+        # FastAPI 是多线程的，必须 check_same_thread=False
+        conn = sqlite3.connect(sqlite_path, check_same_thread=False)
+        saver = SqliteSaver(conn)
+        logger.info("LangGraph SqliteSaver 已启用，路径: %s", sqlite_path)
+        return saver
+    except Exception as exc:  # pragma: no cover - 防御性
+        logger.warning("初始化 SqliteSaver 失败 (%s)，回退到 MemorySaver。", exc)
+        return None
+
+
+def _get_checkpointer():
+    """获取全进程共享的 checkpointer 单例。"""
+    global _checkpointer
+    if _checkpointer is not None:
+        return _checkpointer
+
+    backend = getattr(config.checkpoint, "backend", "sqlite")
+    if backend == "sqlite":
+        _checkpointer = _build_sqlite_checkpointer(config.checkpoint.sqlite_path)
+
+    if _checkpointer is None:
+        _checkpointer = MemorySaver()
+        logger.info("LangGraph 使用 MemorySaver（仅进程内有效）。")
+
+    return _checkpointer
+
+
+def _build_thread_config(session_id: Optional[str]) -> Dict:
+    """根据 session_id 构造 LangGraph 调用 config，实现按用户隔离的 checkpoint。"""
+    thread_id = session_id or "default"
+    return {"configurable": {"thread_id": thread_id}}
+
+
+def _ensure_thread_access_table() -> bool:
+    """确保 checkpoint 访问时间表存在。仅 sqlite 后端需要。"""
+    if getattr(config.checkpoint, "backend", "sqlite") != "sqlite":
+        return False
+
+    sqlite_path = getattr(config.checkpoint, "sqlite_path", "")
+    if not sqlite_path:
+        return False
+
+    try:
+        os.makedirs(os.path.dirname(os.path.abspath(sqlite_path)) or ".", exist_ok=True)
+        with sqlite3.connect(sqlite_path, timeout=30) as conn:
+            conn.execute(
+                """
+                CREATE TABLE IF NOT EXISTS langgraph_thread_access (
+                    thread_id TEXT PRIMARY KEY,
+                    last_seen INTEGER NOT NULL
+                )
+                """
+            )
+        return True
+    except Exception as exc:  # pragma: no cover - 防御性
+        logger.warning("初始化 LangGraph thread 访问表失败: %s", exc)
+        return False
+
+
+def _mark_thread_seen(session_id: Optional[str]) -> None:
+    """记录当前 thread 最近访问时间，用于后续过期清理。"""
+    if not _ensure_thread_access_table():
+        return
+
+    thread_id = session_id or "default"
+    try:
+        with sqlite3.connect(config.checkpoint.sqlite_path, timeout=30) as conn:
+            conn.execute(
+                """
+                INSERT INTO langgraph_thread_access (thread_id, last_seen)
+                VALUES (?, ?)
+                ON CONFLICT(thread_id) DO UPDATE SET last_seen=excluded.last_seen
+                """,
+                (thread_id, int(time.time())),
+            )
+    except Exception as exc:  # pragma: no cover - 防御性
+        logger.warning("更新 LangGraph thread 访问时间失败: %s", exc)
+
+
+def cleanup_expired_checkpoints() -> int:
+    """清理过期 LangGraph checkpoint，返回被清理的 thread 数。"""
+    checkpoint_config = getattr(config, "checkpoint", None)
+    if checkpoint_config is None or not getattr(checkpoint_config, "cleanup_enabled", True):
+        return 0
+    if getattr(checkpoint_config, "backend", "sqlite") != "sqlite":
+        return 0
+    if not _ensure_thread_access_table():
+        return 0
+
+    cutoff = int(time.time()) - int(checkpoint_config.retention_days) * 86400
+    try:
+        with sqlite3.connect(checkpoint_config.sqlite_path, timeout=30) as conn:
+            stale_threads = [
+                row[0]
+                for row in conn.execute(
+                    "SELECT thread_id FROM langgraph_thread_access WHERE last_seen < ?",
+                    (cutoff,),
+                ).fetchall()
+            ]
+            if not stale_threads:
+                return 0
+
+            for thread_id in stale_threads:
+                conn.execute("DELETE FROM writes WHERE thread_id = ?", (thread_id,))
+                conn.execute("DELETE FROM checkpoints WHERE thread_id = ?", (thread_id,))
+                conn.execute("DELETE FROM langgraph_thread_access WHERE thread_id = ?", (thread_id,))
+
+            logger.info("已清理 %s 个过期 LangGraph checkpoint thread。", len(stale_threads))
+            return len(stale_threads)
+    except sqlite3.OperationalError as exc:
+        logger.warning("LangGraph checkpoint 清理跳过（表可能尚未初始化）: %s", exc)
+        return 0
+    except Exception as exc:  # pragma: no cover - 防御性
+        logger.warning("LangGraph checkpoint 清理失败: %s", exc)
+        return 0
 
 
 # Agent that takes the decision of routing the request further to correct task specific agent
@@ -109,6 +259,10 @@ def create_agent_graph():
 
     # Initialize guardrails with the same LLM used elsewhere
     guardrails = LocalGuardrails(config.rag.llm)
+
+    # ---- 重对象单例化：只在图首次编译时创建，节点闭包复用 ----
+    rag_agent = MedicalRAG(config)
+    web_search_processor = WebSearchProcessorAgent(config)
 
     # LLM
     decision_model = config.agent_decision.llm
@@ -367,8 +521,6 @@ def create_agent_graph():
         # Initialize the RAG agent
 
         print(f"Selected agent: RAG_AGENT")
-
-        rag_agent = MedicalRAG(config)
         
         messages = state["messages"]
         query = state["current_input"]
@@ -454,8 +606,6 @@ def create_agent_graph():
             elif isinstance(msg, AIMessage):
                 # print("######### DEBUG 2:", msg)
                 recent_context += f"Assistant: {msg.content}\n"
-
-        web_search_processor = WebSearchProcessorAgent(config)
 
         # Extract text from input (handle case where input is a dict containing an image)
         current_input = state["current_input"]
@@ -779,7 +929,8 @@ def create_agent_graph():
     # workflow.add_edge("human_validation", END)
     
     # Compile the graph
-    return workflow.compile(checkpointer=memory)
+    # 使用全进程共享的 checkpointer（SqliteSaver 优先，回退 MemorySaver）
+    return workflow.compile(checkpointer=_get_checkpointer())
 
 
 def init_agent_state() -> AgentState:
@@ -800,20 +951,40 @@ def init_agent_state() -> AgentState:
     }
 
 
-def process_query(query: Union[str, Dict], conversation_history: List[BaseMessage] = None, language: str = "en", preferred_agent: str = "AUTO") -> str:
+def _get_compiled_graph():
+    """懒加载并缓存编译后的 LangGraph，避免每次请求都重新 compile()。"""
+    global _compiled_graph
+    if _compiled_graph is not None:
+        return _compiled_graph
+    with _graph_lock:
+        if _compiled_graph is None:
+            _compiled_graph = create_agent_graph()
+    return _compiled_graph
+
+
+def process_query(
+    query: Union[str, Dict],
+    conversation_history: List[BaseMessage] = None,
+    language: str = "en",
+    preferred_agent: str = "AUTO",
+    session_id: Optional[str] = None,
+) -> Dict:
     """
     Process a user query through the agent decision system.
-    
+
     Args:
         query: User input (text string or dict with text and image)
-        conversation_history: Optional list of previous messages, NOT NEEDED ANYMORE since the state saves the conversation history now
+        conversation_history: 旧参数，已被 LangGraph checkpoint 取代，仅保留兼容签名
         language: The requested response language (e.g. 'en', 'zh')
         preferred_agent: Optional manual override from user
+        session_id: 用作 LangGraph 的 thread_id，按用户 / 会话隔离 checkpoint
+
     Returns:
-        Response from the appropriate agent
+        最终 AgentState（dict），调用方常用 result['messages'][-1] / result['agent_name']
     """
-    # Initialize the graph
-    graph = create_agent_graph()
+    # 取缓存好的已编译 graph + 当前会话对应的 thread_config
+    graph = _get_compiled_graph()
+    thread_config = _build_thread_config(session_id)
 
     # # Save Graph Flowchart
     # image_bytes = graph.get_graph().draw_mermaid_png()
@@ -837,14 +1008,31 @@ def process_query(query: Union[str, Dict], conversation_history: List[BaseMessag
     
     state["messages"] = [HumanMessage(content=query)]
 
-    # result = graph.invoke(state, thread_config)
+    # 使用按 session_id 构造的 thread_config，让 checkpointer 按用户隔离对话
     result = graph.invoke(state, thread_config)
+    _mark_thread_seen(session_id)
     # print("######### DEBUG 4:", result)
-    # state["messages"] = [result["messages"][-1].content]
 
-    # Keep history to reasonable size (ANOTHER OPTION: summarize and store before truncating history)
-    if len(result["messages"]) > config.max_conversation_history:  # Keep last config.max_conversation_history messages
-        result["messages"] = result["messages"][-config.max_conversation_history:]
+    # ----- 历史截断（同步写回 checkpoint） -------------------------------
+    # 以前这里只是 result["messages"] = result["messages"][-N:]，仅截断了
+    # 当前函数返回值，并没有改 checkpointer 里持久化的状态。下一轮从 checkpoint
+    # 恢复时仍然是完整历史，长会话会让 prompt token 数线性膨胀。
+    #
+    # 修复：用 RemoveMessage(id=...) 让 MessagesState 的 add_messages reducer
+    # 在持久化层把超出窗口的旧消息真正移除，保证下次恢复时也只剩 N 条。
+    max_history = config.max_conversation_history
+    if len(result["messages"]) > max_history:
+        to_drop = result["messages"][:-max_history]
+        remove_ops = [
+            RemoveMessage(id=m.id) for m in to_drop if getattr(m, "id", None)
+        ]
+        if remove_ops:
+            try:
+                graph.update_state(thread_config, {"messages": remove_ops})
+            except Exception as exc:  # pragma: no cover - 防御性
+                logger.warning("LangGraph 历史截断写回失败 (%s)，仅截断返回值。", exc)
+        # 仍然截断返回值，避免下游 m.pretty_print() 打印过长历史
+        result["messages"] = result["messages"][-max_history:]
 
     # visualize conversation history in console
     for m in result["messages"]:

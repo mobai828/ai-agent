@@ -183,7 +183,14 @@ cython_debug/
 # ignore below since it gets updated on every local run
 uploads/
 
+# local runtime databases / checkpoints
+data/*.sqlite
+data/*.sqlite-*
+
 # environment variants
 .env.*
 # 但模板文件需要进版本库，作为新成员的配置参考
 !.env.example
+
+# 本地密钥备忘（仅本机查看，绝不提交）
+LOCAL_SECRETS.md

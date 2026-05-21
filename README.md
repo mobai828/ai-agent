@@ -15,8 +15,10 @@
 [Features](#-features) ·
 [Architecture](#-architecture) ·
 [Quick Start](#-quick-start) ·
+[Project Structure](#-project-structure) ·
 [HTTP API](#-http-api) ·
 [Brain Imaging Pipeline](#-brain-imaging-pipeline) ·
+[Docs](#-docs) ·
 [Changelog](#-changelog)
 
 </div>
@@ -49,6 +51,8 @@ It orchestrates several specialized agents:
 
 - 🤖 **Multi-Agent Orchestration** — LangGraph drives task routing; users may rely on
   automatic routing or **manually force-select** a specific agent.
+- 💾 **Persistent LangGraph Checkpoints** — SQLite-backed conversation state with
+  per-session isolation, history-window pruning and automatic expired-thread cleanup.
 - 🔍 **Agentic RAG** — `PyPDFLoader` + semantic chunking + Qdrant Cloud hybrid search,
   with input/output guardrails.
 - 🏥 **3-Stage Imaging Pipeline** — `segment_image → mark_lesion → diagnose`, returning
@@ -73,8 +77,8 @@ It orchestrates several specialized agents:
 └──────────┴────────────────────┬──────────────────────────────────┘
                                 │
             ┌───────────────────▼────────────────────┐
-            │   LangGraph Agent Decision (auto/      │
-            │   force-select)                        │
+            │   LangGraph Agent Decision             │
+            │   auto/force-select + checkpoint       │
             └─┬─────────┬─────────┬─────────┬─────┬──┘
               │         │         │         │     │
         ┌─────▼──┐ ┌────▼───┐ ┌───▼────┐ ┌──▼───┐ ┌▼──────┐
@@ -90,6 +94,16 @@ It orchestrates several specialized agents:
                                        └───────────────────────────┘
 ```
 
+LangGraph state is checkpointed per browser session:
+
+```text
+session_id cookie → LangGraph thread_id → SqliteSaver checkpoint
+```
+
+By default, checkpoints are stored at `./data/langgraph_checkpoints.sqlite`.
+The system keeps only the recent conversation window in the prompt and runs a
+background cleanup job for long-inactive threads.
+
 ---
 
 ## 🚀 Quick Start
@@ -97,7 +111,7 @@ It orchestrates several specialized agents:
 ### 1. Prerequisites
 
 - Python 3.11+
-- API keys for **Zhipu AI**, **Tavily**, **Qdrant Cloud** (RAG only)
+- API keys for **MiMo**, **Zhipu AI**, **Tavily**, **Qdrant Cloud** (RAG only)
 - Optional: a reachable Heyi remote segmentation service URL
 
 ### 2. Install
@@ -118,8 +132,11 @@ cp .env.example .env
 
 | Env var | Required | Default | Notes |
 |---------|:---:|---------|-------|
-| `ZHIPU_API_KEY` | ✅ | — | LLM provider |
-| `ZHIPU_BASE_URL` | ⛔ | `https://open.bigmodel.cn/api/paas/v4/` | Custom gateway (optional) |
+| `MIMO_API_KEY` | ✅ | — | Main chat LLM provider for decision/conversation/RAG/Web Search |
+| `MIMO_BASE_URL` | ⛔ | `https://token-plan-cn.xiaomimimo.com/v1` | MiMo Token Plan OpenAI-compatible endpoint |
+| `MIMO_CHAT_MODEL` | ⛔ | `mimo-v2.5-pro` | Main chat model |
+| `ZHIPU_API_KEY` | ✅ | — | Embedding and medical vision LLM |
+| `ZHIPU_BASE_URL` | ⛔ | `https://open.bigmodel.cn/api/paas/v4/` | Zhipu OpenAI-compatible gateway |
 | `TAVILY_API_KEY` | ✅ | — | Web Search Agent |
 | `QDRANT_URL` | ⚠️ | — | Required only when using RAG |
 | `QDRANT_API_KEY` | ⚠️ | — | Required only when using RAG |
@@ -132,6 +149,11 @@ cp .env.example .env
 | `HEYI_REMOTE_TASK` | ⛔ | `auto` | Default `task`: `auto` / `hemorrhage` / `ischemia` |
 | `FORCE_OFFLINE_MODE` | ⛔ | `false` | Skip all online calls; use offline fallback agent |
 | `ENABLE_OFFLINE_FALLBACK` | ⛔ | `true` | Auto-fallback when online pipeline fails |
+| `LANGGRAPH_CHECKPOINT_BACKEND` | ⛔ | `sqlite` | `sqlite` for persistent checkpoint, `memory` for test-only state |
+| `LANGGRAPH_CHECKPOINT_SQLITE_PATH` | ⛔ | `./data/langgraph_checkpoints.sqlite` | SQLite checkpoint file |
+| `LANGGRAPH_CHECKPOINT_CLEANUP_ENABLED` | ⛔ | `true` | Enable expired checkpoint cleanup |
+| `LANGGRAPH_CHECKPOINT_RETENTION_DAYS` | ⛔ | `30` | Keep active threads for N days |
+| `LANGGRAPH_CHECKPOINT_CLEANUP_INTERVAL_SECONDS` | ⛔ | `86400` | Cleanup interval |
 
 Local secret storage best practice:
 
@@ -154,6 +176,36 @@ your manual selection in the sidebar).
 ```bash
 python ingest_rag_data.py --dir data/raw
 ```
+
+---
+
+## 🗂️ Project Structure
+
+```text
+.
+├── app.py                         # FastAPI app, API endpoints, static mounts, background cleanup
+├── config.py                      # Centralized runtime configuration
+├── ingest_rag_data.py             # RAG document ingestion helper
+├── requirements.txt               # Python dependencies
+├── agents/
+│   ├── agent_decision.py          # LangGraph routing, checkpointing, history pruning
+│   ├── rag_agent/                 # Medical RAG pipeline
+│   ├── web_search_processor_agent/# Tavily/Web search processing
+│   ├── image_analysis_agent/      # Brain tumor/stroke CV agents
+│   └── guardrails/                # Local input/output guardrails
+├── docs/
+│   ├── API_KEYS.md                # External API and secret checklist
+│   └── LANGGRAPH_CHECKPOINT.md    # Checkpoint architecture and operations
+├── templates/                     # Bootstrap front-end template
+├── assets/                        # Static project assets
+├── data/                          # RAG data, parsed content, local checkpoint db
+├── uploads/                       # Runtime uploads and generated result images (gitignored)
+├── tests/                         # Integration and smoke tests
+└── heyi-Trans-master/             # Vision Transformer segmentation framework
+```
+
+Runtime/generated folders such as `uploads/`, `.venv/`, `.env`, `.env.*`,
+`__pycache__/` and local audio files are ignored by Git.
 
 ---
 
@@ -410,12 +462,25 @@ The adapter accepts these state-dict layouts:
 |-------|--------------|
 | Backend | FastAPI · Uvicorn |
 | Orchestration | LangGraph · LangChain |
-| LLM | Zhipu AI (GLM-4 / GLM-4V) |
+| LLM | MiMo Token Plan (`mimo-v2.5-pro`) for chat/routing/RAG/Web · Zhipu AI for embeddings and medical vision |
 | Vector DB | Qdrant Cloud |
 | Web Search | Tavily |
 | Vision | PyTorch · Torchvision · OpenCV (headless) · `heyi-Trans-master` ViT |
 | Speech | Baidu ASR · gTTS |
 | Frontend | HTML · CSS · JavaScript · Bootstrap 5 · Marked.js |
+
+---
+
+## 📚 Docs
+
+| Document | Purpose |
+|----------|---------|
+| [`docs/API_KEYS.md`](docs/API_KEYS.md) | External API providers, required environment variables and call sites |
+| [`docs/LANGGRAPH_CHECKPOINT.md`](docs/LANGGRAPH_CHECKPOINT.md) | LangGraph checkpoint architecture, persistence, cleanup and operations |
+| [`agents/README.md`](agents/README.md) | Agent-level module overview |
+| [`heyi-Trans-master/README.md`](heyi-Trans-master/README.md) | Heyi vision transformer framework details |
+
+Competition/demo-only materials are kept under `docs/competition_materials/` when present, so the repository root stays focused on runtime files.
 
 ---
 
@@ -444,6 +509,20 @@ Verifies:
 ## 📝 Changelog
 
 > Most recent first.
+
+### `v2026.05` — LangGraph checkpoint persistence and repository cleanup
+
+- 💾 **Persistent LangGraph checkpoints** — SQLite-backed `SqliteSaver` with `MemorySaver`
+  fallback.
+- 🧵 **Per-session isolation** — browser `session_id` is mapped to LangGraph `thread_id`.
+- ✂️ **Checkpoint-aware history pruning** — old messages are removed from persisted state
+  via `RemoveMessage` + `graph.update_state()`.
+- ♻️ **Expired checkpoint cleanup** — background task removes long-inactive threads using
+  the `langgraph_thread_access` table.
+- ⚡ **Runtime optimization** — compiled graph, `MedicalRAG`, and `WebSearchProcessorAgent`
+  are reused instead of rebuilt on every request.
+- 📚 **Documentation update** — README, `.env.example`, API key inventory and checkpoint
+  operations docs now reflect MiMo + LangGraph checkpoint configuration.
 
 ### `v2026.04` — Stroke pipeline overhaul
 

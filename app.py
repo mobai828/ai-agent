@@ -23,7 +23,7 @@ from werkzeug.utils import secure_filename
 from gtts import gTTS
 
 from config import Config
-from agents.agent_decision import process_query
+from agents.agent_decision import cleanup_expired_checkpoints, process_query
 from agents.offline_fallback_agent import OfflineFallbackAgent
 
 # Load configuration
@@ -95,6 +95,23 @@ def cleanup_old_audio():
 # Start background cleanup thread
 cleanup_thread = threading.Thread(target=cleanup_old_audio, daemon=True)
 cleanup_thread.start()
+
+
+def cleanup_langgraph_checkpoints():
+    """Periodically clean expired LangGraph checkpoint threads."""
+    while True:
+        try:
+            cleaned = cleanup_expired_checkpoints()
+            if cleaned:
+                logger.info("Cleaned %s expired LangGraph checkpoint threads.", cleaned)
+        except Exception as e:
+            logger.warning("Error during LangGraph checkpoint cleanup: %s", e)
+        time.sleep(config.checkpoint.cleanup_interval_seconds)
+
+
+if getattr(config.checkpoint, "cleanup_enabled", True):
+    checkpoint_cleanup_thread = threading.Thread(target=cleanup_langgraph_checkpoints, daemon=True)
+    checkpoint_cleanup_thread.start()
 
 
 class QueryRequest(BaseModel):
@@ -247,7 +264,12 @@ def chat(
         )
 
     try:
-        response_data = process_query(request.query, language=request.language, preferred_agent=request.preferred_agent)
+        response_data = process_query(
+            request.query,
+            language=request.language,
+            preferred_agent=request.preferred_agent,
+            session_id=session_id,
+        )
         response_text = _extract_response_text(response_data)
 
         # Set session cookie
@@ -371,7 +393,12 @@ async def upload_image(
 
     try:
         query = {"text": text, "image": file_path, "stroke_task": normalized_stroke_task}
-        response_data = process_query(query, language=language, preferred_agent=preferred_agent)
+        response_data = process_query(
+            query,
+            language=language,
+            preferred_agent=preferred_agent,
+            session_id=session_id,
+        )
         response_text = _extract_response_text(response_data)
 
         # Set session cookie
@@ -578,7 +605,7 @@ def validate_medical_output(
         if comments:
             validation_query += f" Comments: {comments}"
 
-        response_data = process_query(validation_query, language=language)
+        response_data = process_query(validation_query, language=language, session_id=session_id)
 
         if validation_result.lower() == 'yes':
             return {
