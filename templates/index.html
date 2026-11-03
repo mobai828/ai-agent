@@ -563,6 +563,11 @@
     </style>
 </head>
 <body>
+{% if offline_mode %}
+<div id="offline-demo-banner" role="status" style="padding:12px 20px;background:#fff3cd;color:#664d03;text-align:center;font-family:system-ui,sans-serif;">
+    离线演示模式：展示界面与本地兜底回复，不调用在线模型。影像推理、在线检索和语音服务未启用。
+</div>
+{% endif %}
 <div class="container-fluid py-4">
     <div class="row">
         <!-- Sidebar -->

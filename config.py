@@ -12,7 +12,6 @@ Each llm definition has unique temperature value relevant to the specific class.
 
 import os
 from dotenv import load_dotenv
-from langchain_openai import OpenAIEmbeddings, ChatOpenAI
 
 def _to_bool(value: str, default: bool = False) -> bool:
     if value is None:
@@ -32,17 +31,19 @@ def _required_env(name: str) -> str:
 # Load environment variables from .env file
 load_dotenv()
 
-ZHIPU_API_KEY = _required_env("ZHIPU_API_KEY")
+_OFFLINE_MODE = _to_bool(os.getenv("FORCE_OFFLINE_MODE"), default=False)
+ZHIPU_API_KEY = "" if _OFFLINE_MODE else _required_env("ZHIPU_API_KEY")
 ZHIPU_BASE_URL = os.getenv("ZHIPU_BASE_URL", "https://open.bigmodel.cn/api/paas/v4/")
 
 # MiMo (Xiaomi) Token Plan，OpenAI 兼容协议。
 # Token Plan key 形如 tp-xxx，需配合官方提供的区域 endpoint 使用。
-MIMO_API_KEY = _required_env("MIMO_API_KEY")
+MIMO_API_KEY = "" if _OFFLINE_MODE else _required_env("MIMO_API_KEY")
 MIMO_BASE_URL = os.getenv("MIMO_BASE_URL", "https://token-plan-cn.xiaomimimo.com/v1")
 MIMO_CHAT_MODEL = os.getenv("MIMO_CHAT_MODEL", "mimo-v2.5-pro")
 
 class AgentDecisoinConfig:
     def __init__(self):
+        from langchain_openai import ChatOpenAI
         self.llm = ChatOpenAI(
             model=MIMO_CHAT_MODEL,
             api_key=MIMO_API_KEY,
@@ -52,6 +53,7 @@ class AgentDecisoinConfig:
 
 class ConversationConfig:
     def __init__(self):
+        from langchain_openai import ChatOpenAI
         self.llm = ChatOpenAI(
             model=MIMO_CHAT_MODEL,
             api_key=MIMO_API_KEY,
@@ -61,6 +63,7 @@ class ConversationConfig:
 
 class WebSearchConfig:
     def __init__(self):
+        from langchain_openai import ChatOpenAI
         self.llm = ChatOpenAI(
             model=MIMO_CHAT_MODEL,
             api_key=MIMO_API_KEY,
@@ -71,6 +74,7 @@ class WebSearchConfig:
 
 class RAGConfig:
     def __init__(self):
+        from langchain_openai import OpenAIEmbeddings, ChatOpenAI
         self.vector_db_type = "qdrant"
         self.embedding_dim = 2048  # embedding-3 default dimension is 2048
         self.distance_metric = "Cosine"  # Add this with a default value
@@ -132,6 +136,7 @@ class RAGConfig:
 
 class MedicalCVConfig:
     def __init__(self):
+        from langchain_openai import ChatOpenAI
         self.brain_tumor_model_path = "./agents/image_analysis_agent/brain_tumor_agent/models/brain_tumor_segmentation.pth"
         self.brain_stroke_model_path = "./agents/image_analysis_agent/brain_stroke_agent/models/brain_stroke_segmentation.pth"
         # Reserved-interface CV agents output paths
@@ -234,19 +239,25 @@ class UIConfig:
 
 class Config:
     def __init__(self):
-        self.agent_decision = AgentDecisoinConfig()
-        self.conversation = ConversationConfig()
-        self.rag = RAGConfig()
-        self.medical_cv = MedicalCVConfig()
-        self.web_search = WebSearchConfig()
         self.api = APIConfig()
         self.speech = SpeechConfig()
         self.validation = ValidationConfig()
         self.ui = UIConfig()
         self.checkpoint = CheckpointConfig()
         self.eleven_labs_api_key = os.getenv("ELEVEN_LABS_API_KEY")
+        self.max_conversation_history = 20
+        if self.api.force_offline_mode:
+            # The local responder needs neither provider credentials nor ML clients.
+            self.agent_decision = self.conversation = self.rag = None
+            self.medical_cv = self.web_search = None
+            self.tavily_api_key = ""
+            return
+        self.agent_decision = AgentDecisoinConfig()
+        self.conversation = ConversationConfig()
+        self.rag = RAGConfig()
+        self.medical_cv = MedicalCVConfig()
+        self.web_search = WebSearchConfig()
         self.tavily_api_key = _required_env("TAVILY_API_KEY")
-        self.max_conversation_history = 20  # Include last 20 messsages (10 Q&A pairs) in history
 
 # # Example usage
 # config = Config()

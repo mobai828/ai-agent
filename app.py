@@ -23,13 +23,27 @@ from werkzeug.utils import secure_filename
 from gtts import gTTS
 
 from config import Config
-from agents.agent_decision import cleanup_expired_checkpoints, process_query
 from agents.offline_fallback_agent import OfflineFallbackAgent
 
 # Load configuration
 config = Config()
 logger = logging.getLogger(__name__)
 offline_fallback_agent = OfflineFallbackAgent()
+
+
+def process_query(*args, **kwargs):
+    """Load the online graph only when an online request actually needs it."""
+    if config.api.force_offline_mode:
+        raise RuntimeError("Online agents are disabled in offline demo mode.")
+    from agents.agent_decision import process_query as online_process_query
+    return online_process_query(*args, **kwargs)
+
+
+def _offline_only_response():
+    return JSONResponse(
+        status_code=503,
+        content={"status": "unavailable", "message": "This feature is disabled in offline demo mode."},
+    )
 
 # Initialize FastAPI app
 app = FastAPI(title="Multi-Agent Medical Chatbot", version="2.0")
@@ -99,6 +113,7 @@ cleanup_thread.start()
 
 def cleanup_langgraph_checkpoints():
     """Periodically clean expired LangGraph checkpoint threads."""
+    from agents.agent_decision import cleanup_expired_checkpoints
     while True:
         try:
             cleaned = cleanup_expired_checkpoints()
@@ -109,7 +124,7 @@ def cleanup_langgraph_checkpoints():
         time.sleep(config.checkpoint.cleanup_interval_seconds)
 
 
-if getattr(config.checkpoint, "cleanup_enabled", True):
+if not config.api.force_offline_mode and getattr(config.checkpoint, "cleanup_enabled", True):
     checkpoint_cleanup_thread = threading.Thread(target=cleanup_langgraph_checkpoints, daemon=True)
     checkpoint_cleanup_thread.start()
 
@@ -237,13 +252,15 @@ def _build_offline_response(query: Union[str, Dict], language: str, reason: str 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     """Serve the main HTML page"""
-    return templates.TemplateResponse(request=request, name="index.html")
+    return templates.TemplateResponse(
+        request=request, name="index.html", context={"offline_mode": config.api.force_offline_mode}
+    )
 
 
 @app.get("/health")
 def health_check():
     """Health check endpoint for Docker health checks"""
-    return {"status": "healthy"}
+    return {"status": "healthy", "mode": "offline" if config.api.force_offline_mode else "online"}
 
 
 @app.post("/chat")
@@ -506,6 +523,8 @@ async def api_brain_stroke_segment(
         }
         ```
     """
+    if config.api.force_offline_mode:
+        return _offline_only_response()
     if not allowed_file(image.filename):
         return JSONResponse(
             status_code=400,
@@ -592,6 +611,8 @@ def validate_medical_output(
         session_id: Optional[str] = Cookie(None)
 ):
     """Handle human validation for medical AI outputs."""
+    if config.api.force_offline_mode:
+        return _offline_only_response()
     # Generate session ID for cookie if it doesn't exist
     if not session_id:
         session_id = str(uuid.uuid4())
@@ -626,6 +647,8 @@ def validate_medical_output(
 
 @app.post("/transcribe")
 async def transcribe_audio(audio: UploadFile = File(...)):
+    if config.api.force_offline_mode:
+        return _offline_only_response()
     """Endpoint to transcribe speech using Baidu ASR API"""
     if not audio.filename:
         return JSONResponse(
@@ -732,6 +755,8 @@ async def transcribe_audio(audio: UploadFile = File(...)):
 
 @app.post("/generate-speech")
 async def generate_speech(request: SpeechRequest):
+    if config.api.force_offline_mode:
+        return _offline_only_response()
     """Endpoint to generate speech using Google TTS (gTTS)"""
     try:
         text = request.text

@@ -1,0 +1,12 @@
+# Lightweight offline demo; online LangGraph / model dependencies are separate.
+fastapi>=0.115,<1
+uvicorn>=0.30,<1
+python-multipart>=0.0.18,<1
+Jinja2>=3.1,<4
+Werkzeug>=3,<4
+gTTS>=2.5,<3
+python-dotenv>=1,<2
+requests>=2.31,<3
+
+# Only required by tests/test_offline_startup.py (FastAPI TestClient).
+httpx>=0.27,<1

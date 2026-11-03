@@ -1,3 +1,25 @@
+> 基于 [Multi-Agent-Medical-Assistant](https://github.com/souvikmajumder26/Multi-Agent-Medical-Assistant) 进行二次开发的团队项目，本仓库为个人整理与维护副本。
+>
+> **本人负责：Agent 工作流搭建与路由集成、适配。** 相关个人提交还包含按会话隔离的状态保存、SQLite checkpoint 与历史清理改造。下文介绍团队系统的整体功能。
+>
+> [个人贡献与项目来源说明](PERSONAL_CONTRIBUTION.md)
+
+---
+
+## 本地预览：无需在线模型密钥
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements-offline.txt
+.\scripts\start-offline-demo.ps1
+```
+
+打开 `http://127.0.0.1:8000/`。页面会标明离线演示，聊天返回本地兜底结果；影像推理、在线检索、人工校验和语音服务在该模式下不启用。
+
+[启动说明与验证记录](docs/LOCAL_DEMO.md) · [个人贡献与来源](PERSONAL_CONTRIBUTION.md)
+
+![离线聊天演示](docs/screenshots/offline-chat.png)
+
 <div align="center">
 
 # ⚕️ Multi-Agent Medical Assistant
